@@ -1,0 +1,751 @@
+<!doctype html>
+<html lang="pt-BR">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1, viewport-fit=cover">
+<title>SDV — Sistema de Despacho de Viaturas</title>
+<meta name="description" content="Duas centrais, uma viatura, exatamente um despacho. O fluxo do SDV em cinco etapas.">
+<link rel="preconnect" href="https://fonts.googleapis.com">
+<link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+<link rel="stylesheet" href="https://fonts.googleapis.com/css2?family=Archivo:ital,wght@0,500;0,600;0,700;1,700&family=IBM+Plex+Mono:wght@400;500&family=Public+Sans:wght@0,400;0,600&display=swap">
+<style>
+/* ───────────────────────────────────────────────
+   SDV — prancheta de despacho, luz de dia.
+   5 cores base; tudo mais é derivado por color-mix.
+   ─────────────────────────────────────────────── */
+:root{
+  --c-bg:#ffffff;
+  --c-text:#121a21;
+  --c-muted:#62707c;
+  --c-line:#d7dee4;
+  --c-accent:#d93b2b;
+
+  --page:color-mix(in srgb, var(--c-bg) 96%, var(--c-text) 4%);
+  --surface:color-mix(in srgb, var(--c-bg) 97%, var(--c-text) 3%);
+  --surface-2:color-mix(in srgb, var(--c-bg) 93%, var(--c-text) 7%);
+  --line-soft:color-mix(in srgb, var(--c-line) 62%, transparent);
+  --grid:color-mix(in srgb, var(--c-line) 55%, transparent);
+  --accent-ghost:color-mix(in srgb, var(--c-accent) 8%, transparent);
+  --accent-dim:color-mix(in srgb, var(--c-accent) 32%, transparent);
+  --text-dim:color-mix(in srgb, var(--c-text) 72%, transparent);
+  --scrim:color-mix(in srgb, var(--c-text) 40%, transparent);
+
+  --f-display:"Archivo",system-ui,sans-serif;
+  --f-body:"Public Sans",system-ui,sans-serif;
+  --f-mono:"IBM Plex Mono",ui-monospace,monospace;
+  --t-h1:clamp(2.3rem,1.2rem + 4.4vw,4.2rem);
+  --t-h2:clamp(1.65rem,1.1rem + 2.2vw,2.6rem);
+  --t-body:clamp(.95rem,.92rem + .16vw,1.03rem);
+  --t-num:clamp(1.9rem,1.3rem + 2.2vw,2.8rem);
+  --t-micro:.66rem;
+  --t-mono:.72rem;
+
+  --r:3px; --r-pill:100px; --bw:1px;
+  --s1:4px; --s2:8px; --s3:12px; --s4:18px; --s5:28px; --s6:44px; --s7:68px; --s8:96px;
+  --maxw:1180px; --grid-size:44px; --header-h:70px;
+}
+*,*::before,*::after{box-sizing:border-box}
+html{scroll-behavior:smooth;scroll-padding-top:calc(var(--header-h) + 16px + env(safe-area-inset-top,0px));-webkit-text-size-adjust:100%}
+body{margin:0;background:var(--page);color:var(--c-text);font-family:var(--f-body);font-size:var(--t-body);line-height:1.6;-webkit-font-smoothing:antialiased;overflow-x:hidden}
+img,svg{max-width:100%;display:block}
+a{color:inherit}
+:focus-visible{outline:3px solid var(--c-accent);outline-offset:2px}
+::selection{background:var(--accent-dim)}
+.wrap{width:100%;max-width:var(--maxw);margin-inline:auto;padding-inline:clamp(16px,4vw,36px)}
+.sr-only{position:absolute;width:1px;height:1px;overflow:hidden;clip:rect(0 0 0 0);white-space:nowrap}
+.skip{position:absolute;left:8px;top:-60px;z-index:200;background:var(--c-accent);color:var(--c-bg);padding:10px 16px;font-family:var(--f-mono);font-size:var(--t-mono);text-decoration:none}
+.skip:focus{top:8px}
+.grid-bg{background-image:linear-gradient(to right,var(--grid) var(--bw),transparent var(--bw)),linear-gradient(to bottom,var(--grid) var(--bw),transparent var(--bw));background-size:var(--grid-size) var(--grid-size)}
+
+h1,h2,h3{font-family:var(--f-display);font-weight:700;letter-spacing:-.02em;line-height:1.08;margin:0}
+h1{font-size:var(--t-h1)}
+h2{font-size:var(--t-h2);line-height:1.1}
+h3{font-size:1.06rem;letter-spacing:-.005em;line-height:1.25}
+em{font-style:italic;color:var(--c-accent)}
+p{margin:0 0 var(--s4)}
+strong{font-weight:600}
+.mono{font-family:var(--f-mono);font-size:var(--t-mono);letter-spacing:.08em}
+.micro{font-family:var(--f-mono);font-size:var(--t-micro);letter-spacing:.16em;text-transform:uppercase;color:var(--c-muted)}
+.tag{font-family:var(--f-mono);font-size:var(--t-micro);letter-spacing:.14em;text-transform:uppercase;color:var(--c-muted);border:var(--bw) solid var(--c-line);padding:3px 8px;border-radius:var(--r);display:inline-block;background:var(--c-bg)}
+
+/* 0 — topline */
+.topline{background:var(--c-bg);border-bottom:var(--bw) solid var(--c-line);padding-top:env(safe-area-inset-top,0px)}
+.topline__in{display:flex;align-items:center;justify-content:space-between;gap:var(--s3);min-height:30px;font-family:var(--f-mono);font-size:var(--t-micro);letter-spacing:.18em;text-transform:uppercase;color:var(--c-muted)}
+.dot{width:6px;height:6px;border-radius:var(--r-pill);background:var(--c-accent);display:inline-block;margin-right:8px;animation:pulse 2.4s ease-in-out infinite}
+@keyframes pulse{0%,100%{opacity:1}50%{opacity:.3}}
+.topline__right{white-space:nowrap;overflow:hidden;text-overflow:ellipsis}
+
+/* 1 — header */
+.hdr{position:sticky;top:0;z-index:100;background:var(--c-bg);border-bottom:var(--bw) solid var(--c-line);padding-top:env(safe-area-inset-top,0px)}
+.hdr__in{display:flex;align-items:center;gap:var(--s5);min-height:var(--header-h)}
+.brand{display:flex;align-items:center;gap:var(--s3);text-decoration:none;flex:0 0 auto}
+.brand__mark{width:28px;height:28px;flex:0 0 auto}
+.brand__name{font-family:var(--f-display);font-weight:700;font-size:1.02rem;line-height:1}
+.brand__sub{display:block;font-family:var(--f-mono);font-size:var(--t-micro);letter-spacing:.13em;text-transform:uppercase;color:var(--c-muted);line-height:1.35;margin-top:3px}
+.nav{margin-left:auto;display:flex;align-items:center;gap:var(--s5)}
+.nav a{font-family:var(--f-mono);font-size:var(--t-mono);letter-spacing:.11em;text-transform:uppercase;text-decoration:none;color:var(--c-muted);padding:4px 0;border-bottom:var(--bw) solid transparent}
+.nav a:hover{color:var(--c-text)}
+.nav a[aria-current="true"]{color:var(--c-text);border-bottom-color:var(--c-accent)}
+.hdr__cta{font-family:var(--f-mono);font-size:var(--t-mono);letter-spacing:.11em;text-transform:uppercase;color:var(--c-text);background:var(--c-bg);border:var(--bw) solid var(--c-line);border-radius:var(--r);padding:9px 14px;cursor:pointer}
+.hdr__cta:hover{border-color:var(--c-accent)}
+.burger{display:none;background:var(--c-bg);border:var(--bw) solid var(--c-line);border-radius:var(--r);color:var(--c-text);width:40px;height:36px;cursor:pointer;margin-left:auto;font-family:var(--f-mono)}
+.progress{position:absolute;left:0;bottom:-1px;height:2px;width:0;background:var(--c-accent)}
+
+/* 2 — hero */
+.hero{padding-top:var(--s7);padding-bottom:var(--s6);border-bottom:var(--bw) solid var(--c-line)}
+.eyebrow{display:flex;align-items:center;gap:var(--s2);font-family:var(--f-mono);font-size:var(--t-micro);letter-spacing:.2em;text-transform:uppercase;color:var(--c-muted);margin-bottom:var(--s4)}
+.eyebrow::before{content:"";width:7px;height:7px;border-radius:var(--r-pill);border:var(--bw) solid var(--c-accent);background:var(--accent-ghost)}
+.hero__grid{display:grid;grid-template-columns:1fr;gap:var(--s6)}
+.hero__lead{font-size:clamp(1.02rem,.96rem + .45vw,1.2rem);color:var(--text-dim);max-width:44ch;margin-top:var(--s5)}
+.cta-row{display:flex;flex-wrap:wrap;align-items:center;gap:var(--s5);margin-top:var(--s5)}
+.btn{font-family:var(--f-mono);font-size:var(--t-mono);letter-spacing:.13em;text-transform:uppercase;background:var(--c-accent);color:var(--c-bg);border:var(--bw) solid var(--c-accent);border-radius:var(--r);padding:14px 22px;text-decoration:none;cursor:pointer;font-weight:500;display:inline-block}
+.btn:hover{opacity:.87}
+.btn--ghost{background:var(--c-bg);color:var(--c-text);border-color:var(--c-line)}
+.btn--ghost:hover{border-color:var(--c-accent);opacity:1}
+.btn--sm{padding:9px 13px}
+.link-arrow{font-family:var(--f-mono);font-size:var(--t-mono);letter-spacing:.13em;text-transform:uppercase;text-decoration:none;border-bottom:var(--bw) solid var(--c-line);padding-bottom:3px}
+.link-arrow:hover{border-bottom-color:var(--c-accent)}
+.cred{margin-top:var(--s6);padding-top:var(--s3);border-top:var(--bw) solid var(--c-line);font-family:var(--f-mono);font-size:var(--t-micro);letter-spacing:.14em;text-transform:uppercase;color:var(--c-muted)}
+.figure__box{border:var(--bw) solid var(--c-line);background:var(--surface);position:relative;overflow:hidden;border-radius:var(--r)}
+.figure__cap{margin-top:var(--s2);font-family:var(--f-mono);font-size:var(--t-micro);letter-spacing:.15em;text-transform:uppercase;color:var(--c-muted)}
+.stamp{position:absolute;right:var(--s3);top:var(--s3);border:var(--bw) solid var(--c-line);background:var(--c-bg);padding:var(--s2) var(--s3);border-radius:var(--r)}
+.stamp__l{font-family:var(--f-mono);font-size:var(--t-micro);letter-spacing:.16em;text-transform:uppercase;color:var(--c-muted)}
+.stamp__v{font-family:var(--f-mono);font-size:var(--t-mono);margin-top:2px;word-break:break-all}
+.stamp__d{font-family:var(--f-mono);font-size:var(--t-micro);letter-spacing:.1em;color:var(--c-accent);margin-top:2px}
+
+/* faixa de prova */
+.proof{margin-top:var(--s7);border-top:var(--bw) solid var(--c-line);padding-top:var(--s5)}
+.proof__row{display:grid;grid-template-columns:1fr;gap:var(--s5)}
+.proof__n{font-family:var(--f-display);font-weight:700;font-size:var(--t-num);line-height:1;letter-spacing:-.03em;color:var(--c-accent)}
+.proof__t{font-weight:600;margin-top:var(--s2)}
+.proof__d{color:var(--c-muted);font-size:.86rem;line-height:1.45}
+.proof__note{margin-top:var(--s5);padding-top:var(--s3);border-top:var(--bw) solid var(--c-line);font-family:var(--f-mono);font-size:var(--t-micro);letter-spacing:.24em;text-transform:uppercase;color:var(--c-muted)}
+
+/* seções */
+section{scroll-margin-top:calc(var(--header-h) + 16px)}
+.sec{padding-block:var(--s8);border-bottom:var(--bw) solid var(--c-line)}
+.sec__head{display:grid;grid-template-columns:1fr;gap:var(--s4);margin-bottom:var(--s6)}
+.eyebrow-num{display:inline-flex;align-items:center;gap:var(--s2);font-family:var(--f-mono);font-size:var(--t-micro);letter-spacing:.2em;text-transform:uppercase;color:var(--c-muted);margin-bottom:var(--s4)}
+.eyebrow-num span{border:var(--bw) solid var(--c-accent);border-radius:var(--r-pill);color:var(--c-accent);padding:2px 9px;letter-spacing:.1em}
+.sec__intro{color:var(--text-dim);max-width:40ch;align-self:end}
+.sec__intro p:last-child{margin-bottom:0}
+
+/* 3 — cards */
+.cards3{display:grid;grid-template-columns:1fr;gap:var(--bw);background:var(--c-line);border:var(--bw) solid var(--c-line);border-radius:var(--r);overflow:hidden}
+.card{background:var(--c-bg);padding:var(--s5)}
+.card__ic{color:var(--c-accent);margin-bottom:var(--s3)}
+.card__l{font-family:var(--f-mono);font-size:var(--t-micro);letter-spacing:.18em;text-transform:uppercase;color:var(--c-muted);margin-bottom:var(--s3)}
+.card h3{margin-bottom:var(--s2)}
+.card p{color:var(--text-dim);font-size:.93rem;margin-bottom:var(--s4)}
+.card__stack{font-family:var(--f-mono);font-size:var(--t-micro);letter-spacing:.07em;color:var(--c-muted);border-top:var(--bw) solid var(--line-soft);padding-top:var(--s3);line-height:1.7;word-break:break-word}
+
+/* 4 — fluxo animado (não interativo) */
+.board{border:var(--bw) solid var(--c-line);background:var(--c-bg);border-radius:var(--r);padding:var(--s5)}
+.board__grid{display:grid;grid-template-columns:1fr;align-items:stretch;gap:0}
+.st{border:var(--bw) solid var(--c-line);border-radius:var(--r);background:var(--c-bg);padding:var(--s4);text-align:center;animation:acende 12s linear infinite;animation-delay:calc(var(--i) * 2.4s)}
+.st__ic{margin:0 auto var(--s3);color:var(--c-muted);animation:tinge 12s linear infinite;animation-delay:calc(var(--i) * 2.4s)}
+.st__t{font-family:var(--f-display);font-weight:700;font-size:.98rem;line-height:1.2}
+.st__d{font-size:.82rem;color:var(--c-muted);margin-top:4px;line-height:1.4}
+.st__chip{display:inline-block;margin-top:var(--s3);font-family:var(--f-mono);font-size:var(--t-micro);letter-spacing:.14em;text-transform:uppercase;border:var(--bw) solid var(--c-line);border-radius:var(--r-pill);padding:3px 10px;color:var(--c-muted);animation:chip 12s linear infinite;animation-delay:calc(var(--i) * 2.4s)}
+@keyframes acende{0%,1%{border-color:var(--c-line);background:var(--c-bg)}3%,18%{border-color:var(--c-accent);background:var(--accent-ghost)}21%,100%{border-color:var(--c-line);background:var(--c-bg)}}
+@keyframes tinge{0%,1%{color:var(--c-muted)}3%,18%{color:var(--c-accent)}21%,100%{color:var(--c-muted)}}
+@keyframes chip{0%,1%{color:var(--c-muted);border-color:var(--c-line)}3%,18%{color:var(--c-accent);border-color:var(--accent-dim)}21%,100%{color:var(--c-muted);border-color:var(--c-line)}}
+.conn{position:relative;display:flex;align-items:center;justify-content:center;min-height:34px;min-width:34px}
+.conn__l{background:var(--c-line);width:var(--bw);height:100%}
+.conn__d{position:absolute;width:8px;height:8px;border-radius:var(--r-pill);background:var(--c-accent);opacity:0;left:50%;margin-left:-4px;animation:vai-v 12s linear infinite;animation-delay:calc(var(--i) * 2.4s)}
+@keyframes vai-v{0%,14%{top:0;opacity:0}15%{top:0;opacity:1}20%{top:100%;opacity:1}21%,100%{top:100%;opacity:0}}
+@keyframes vai-h{0%,14%{left:0;opacity:0}15%{left:0;opacity:1}20%{left:100%;opacity:1}21%,100%{left:100%;opacity:0}}
+.board__cap{margin-top:var(--s5);padding-top:var(--s4);border-top:var(--bw) solid var(--c-line);display:grid;grid-template-columns:repeat(auto-fit,minmax(150px,1fr));gap:var(--s4)}
+.cap{animation:cap 12s linear infinite;animation-delay:calc(var(--i) * 2.4s)}
+.cap__n{font-family:var(--f-mono);font-size:var(--t-micro);letter-spacing:.16em;color:var(--c-muted)}
+.cap__t{font-size:.88rem;margin-top:4px;line-height:1.45}
+@keyframes cap{0%,1%{opacity:.45}3%,18%{opacity:1}21%,100%{opacity:.45}}
+.lock{margin-top:var(--s5);display:grid;grid-template-columns:1fr;gap:var(--s3);border-top:var(--bw) solid var(--c-line);padding-top:var(--s5)}
+.lock__i{display:flex;align-items:center;gap:var(--s3);border:var(--bw) solid var(--c-line);border-radius:var(--r);padding:var(--s3) var(--s4);background:var(--surface)}
+.lock__i b{font-family:var(--f-mono);font-size:var(--t-mono);letter-spacing:.1em}
+.lock__i span{font-size:.84rem;color:var(--c-muted)}
+.lock__sig{width:22px;height:22px;flex:0 0 auto;border-radius:var(--r-pill);display:grid;place-items:center;font-family:var(--f-mono);font-size:.7rem;border:var(--bw) solid var(--c-line);color:var(--c-muted)}
+.lock__i[data-win="1"]{border-color:var(--accent-dim)}
+.lock__i[data-win="1"] .lock__sig{border-color:var(--c-accent);color:var(--c-accent)}
+.lab-note{margin-top:var(--s3);font-family:var(--f-mono);font-size:var(--t-micro);letter-spacing:.13em;text-transform:uppercase;color:var(--c-muted)}
+
+/* 5 — arquitetura */
+.arch{border:var(--bw) solid var(--c-line);background:var(--c-bg);border-radius:var(--r);padding:var(--s5)}
+.contract{display:grid;grid-template-columns:1fr;gap:var(--s6);margin-top:var(--s6)}
+.rules{display:grid;gap:var(--s2);margin:var(--s4) 0 var(--s5);padding:0;list-style:none}
+.rules li{font-family:var(--f-mono);font-size:var(--t-mono);color:var(--c-muted);border-bottom:var(--bw) solid var(--line-soft);padding-bottom:var(--s2)}
+.rules b{color:var(--c-text);font-weight:500}
+.code{border:var(--bw) solid var(--c-line);background:var(--surface);border-radius:var(--r);overflow:hidden}
+.code__bar{display:flex;align-items:center;justify-content:space-between;gap:var(--s3);padding:var(--s2) var(--s3);border-bottom:var(--bw) solid var(--c-line);background:var(--c-bg)}
+.code pre{margin:0;padding:var(--s4);overflow-x:auto;font-family:var(--f-mono);font-size:var(--t-mono);line-height:1.8;color:var(--text-dim)}
+.code pre b{color:var(--c-accent);font-weight:500}
+
+/* 6 — decisões */
+.band{border-block:var(--bw) solid var(--c-line);padding-block:var(--s4);margin-bottom:var(--s6);display:flex;flex-wrap:wrap;gap:var(--s3) var(--s6);font-family:var(--f-mono);font-size:var(--t-micro);letter-spacing:.22em;text-transform:uppercase;color:var(--c-muted)}
+.dec{display:grid;grid-template-columns:1fr;gap:var(--bw);background:var(--c-line);border:var(--bw) solid var(--c-line);border-radius:var(--r);overflow:hidden}
+.dec__i{background:var(--c-bg);padding:var(--s5)}
+.dec__n{font-family:var(--f-mono);font-size:var(--t-mono);color:var(--c-accent);margin-bottom:var(--s3)}
+.dec__i p{color:var(--text-dim);font-size:.92rem;margin:var(--s2) 0 var(--s3)}
+.dec__s{font-family:var(--f-mono);font-size:var(--t-micro);letter-spacing:.07em;color:var(--c-muted);word-break:break-word}
+.ev{margin-top:var(--s6);border:var(--bw) solid var(--c-line);border-radius:var(--r);overflow:hidden}
+.ev__h{padding:var(--s4);border-bottom:var(--bw) solid var(--c-line);background:var(--c-bg);display:flex;flex-wrap:wrap;gap:var(--s3);align-items:center}
+.ev__h p{margin:0;color:var(--c-muted);font-size:.84rem;max-width:56ch}
+.ev__row{display:grid;grid-template-columns:repeat(3,1fr);gap:var(--bw);background:var(--c-line)}
+.ev__i{background:var(--c-bg);padding:var(--s4)}
+.metric__n{font-family:var(--f-display);font-weight:700;font-size:clamp(1.5rem,1.2rem + 1vw,2rem);line-height:1;letter-spacing:-.02em}
+.metric__c{font-family:var(--f-mono);font-size:var(--t-micro);letter-spacing:.13em;text-transform:uppercase;color:var(--c-muted);margin-top:6px;line-height:1.45}
+
+/* 7 — fechamento + footer */
+.close{padding-block:var(--s8);border-bottom:var(--bw) solid var(--c-line)}
+.close__band{font-family:var(--f-mono);font-size:var(--t-micro);letter-spacing:.26em;text-transform:uppercase;color:var(--c-accent);margin-bottom:var(--s5)}
+.close__foot{margin-top:var(--s6);padding-top:var(--s3);border-top:var(--bw) solid var(--c-line);font-family:var(--f-mono);font-size:var(--t-micro);letter-spacing:.14em;text-transform:uppercase;color:var(--c-muted)}
+.ft{padding-block:var(--s6);padding-bottom:calc(var(--s6) + env(safe-area-inset-bottom,0px))}
+.ft__in{display:grid;gap:var(--s5)}
+.ft__links{display:flex;flex-wrap:wrap;gap:var(--s3) var(--s5)}
+.ft__links a{font-family:var(--f-mono);font-size:var(--t-mono);letter-spacing:.11em;text-transform:uppercase;color:var(--c-muted);text-decoration:none}
+.ft__links a:hover{color:var(--c-text)}
+.legal{color:var(--c-muted);font-size:.79rem;max-width:74ch;line-height:1.55}
+.top-btn{font-family:var(--f-mono);font-size:var(--t-micro);letter-spacing:.14em;text-transform:uppercase;background:var(--c-bg);border:var(--bw) solid var(--c-line);border-radius:var(--r);color:var(--c-muted);padding:9px 13px;cursor:pointer;justify-self:start}
+
+/* sobreposições */
+dialog{border:var(--bw) solid var(--c-line);background:var(--c-bg);color:var(--c-text);padding:0;max-width:600px;width:calc(100% - 32px);border-radius:var(--r)}
+dialog::backdrop{background:var(--scrim)}
+.dlg__bar{display:flex;align-items:center;justify-content:space-between;gap:var(--s3);padding:var(--s4);border-bottom:var(--bw) solid var(--c-line)}
+.dlg__body{padding:var(--s5);max-height:64vh;overflow:auto}
+.dlg__body ul{margin:0 0 var(--s4);padding-left:1.1rem;color:var(--text-dim);font-size:.92rem}
+.dlg__body li{margin-bottom:var(--s2)}
+.tree{font-family:var(--f-mono);font-size:var(--t-micro);line-height:1.8;color:var(--c-muted);border:var(--bw) solid var(--c-line);background:var(--surface);padding:var(--s4);overflow-x:auto;margin:0 0 var(--s4)}
+.toast{position:fixed;left:50%;bottom:24px;transform:translate(-50%,16px);z-index:300;background:var(--c-text);color:var(--c-bg);font-family:var(--f-mono);font-size:var(--t-mono);letter-spacing:.1em;text-transform:uppercase;padding:11px 18px;border-radius:var(--r);opacity:0;pointer-events:none;transition:opacity .2s,transform .2s}
+.toast[data-on="1"]{opacity:1;transform:translate(-50%,0)}
+.reveal{opacity:0;transform:translateY(12px);transition:opacity .6s ease,transform .6s ease}
+.reveal.is-in{opacity:1;transform:none}
+.ns{border:var(--bw) solid var(--c-accent);background:var(--accent-ghost);padding:var(--s4);margin-top:var(--s5);font-family:var(--f-mono);font-size:var(--t-mono);line-height:1.7}
+
+/* breakpoints */
+@media (min-width:768px){
+  .proof__row{grid-template-columns:repeat(3,1fr);gap:var(--s6)}
+  .cards3{grid-template-columns:repeat(3,1fr)}
+  .sec__head{grid-template-columns:1.1fr .9fr;gap:var(--s7)}
+  .contract{grid-template-columns:1fr 1fr}
+  .dec{grid-template-columns:1fr 1fr}
+  .lock{grid-template-columns:1fr 1fr}
+}
+@media (min-width:1000px){
+  .hero__grid{grid-template-columns:1fr 1fr;align-items:center}
+  .board__grid{grid-template-columns:1fr auto 1fr auto 1fr auto 1fr auto 1fr}
+  .conn__l{width:100%;height:var(--bw)}
+  .conn__d{top:50%;margin-top:-4px;left:auto;margin-left:0;animation-name:vai-h}
+  .dec{grid-template-columns:repeat(4,1fr)}
+}
+@media (max-width:860px){
+  .nav{display:none;order:3;width:100%}
+  .hdr__cta{display:none}
+  .burger{display:block}
+  .hdr__in{flex-wrap:wrap;padding-bottom:var(--s2)}
+  .hdr[data-open="1"] .nav{display:flex;flex-direction:column;align-items:flex-start;gap:var(--s3);padding-bottom:var(--s4);margin-left:0}
+  .hdr[data-open="1"] .hdr__cta{display:block;order:4;margin-bottom:var(--s4)}
+}
+@media (max-width:420px){.ev__row{grid-template-columns:1fr}}
+@media (prefers-reduced-motion:reduce){
+  html{scroll-behavior:auto}
+  *,*::before,*::after{animation:none!important;transition:none!important}
+  .reveal{opacity:1;transform:none}
+  .conn__d{display:none}
+  .cap{opacity:1}
+}
+</style>
+</head>
+<body>
+<a class="skip" href="#conteudo">Pular para o conteúdo</a>
+
+<div class="topline">
+  <div class="wrap topline__in">
+    <span><span class="dot" aria-hidden="true"></span>Sistemas distribuídos · concorrência</span>
+    <span class="topline__right">Central → Gateway → Viatura</span>
+  </div>
+</div>
+
+<header class="hdr" id="hdr" data-open="0">
+  <div class="wrap hdr__in">
+    <a class="brand" href="#topo">
+      <svg class="brand__mark" viewBox="0 0 32 32" fill="none" aria-hidden="true">
+        <rect x="1" y="1" width="30" height="30" stroke="var(--c-line)"/>
+        <path d="M1 11h30M1 21h30M11 1v30M21 1v30" stroke="var(--grid)"/>
+        <circle cx="16" cy="16" r="5" stroke="var(--c-accent)"/><circle cx="16" cy="16" r="1.8" fill="var(--c-accent)"/>
+      </svg>
+      <span><span class="brand__name">SDV</span><span class="brand__sub">Sistema de Despacho<br>de Viaturas</span></span>
+    </a>
+    <button class="burger" id="burger" aria-expanded="false" aria-controls="nav" aria-label="Abrir menu">≡</button>
+    <nav class="nav" id="nav" aria-label="Seções">
+      <a href="#problema">01 Problema</a>
+      <a href="#fluxo">02 Fluxo</a>
+      <a href="#arquitetura">03 Arquitetura</a>
+      <a href="#decisoes">04 Decisões</a>
+    </nav>
+    <button class="hdr__cta" id="abrir-guia">Guia técnico</button>
+  </div>
+  <div class="progress" id="progress" aria-hidden="true"></div>
+</header>
+
+<main id="conteudo">
+
+<!-- HERO -->
+<section class="hero grid-bg" id="topo" aria-labelledby="h-hero">
+  <div class="wrap">
+    <div class="hero__grid">
+      <div>
+        <p class="eyebrow">Alocação sob concorrência</p>
+        <h1 id="h-hero">Duas centrais.<br>Uma viatura.<br>Exatamente um <em>despacho.</em></h1>
+        <p class="hero__lead">Várias centrais disputam a mesma frota ao mesmo tempo. <strong>Só uma alocação pode vencer.</strong></p>
+        <div class="cta-row">
+          <a class="btn" href="#fluxo">Ver o fluxo</a>
+          <a class="link-arrow" href="#arquitetura">Arquitetura →</a>
+        </div>
+        <p class="cred">Projeto acadêmico · GraphQL Federation · Redis Streams &amp; Lock</p>
+        <noscript><p class="ns">Sem JavaScript, o guia técnico e o botão copiar não funcionam. A animação do fluxo é CSS e continua rodando.</p></noscript>
+      </div>
+
+      <div class="reveal">
+        <div class="figure__box">
+          <svg viewBox="0 0 700 430" role="img" aria-labelledby="fig1">
+            <title id="fig1">Duas centrais enviam requisições para a mesma viatura; só uma obtém o lock, a outra segue para a próxima viatura.</title>
+            <defs><pattern id="malha" width="44" height="44" patternUnits="userSpaceOnUse"><path d="M44 0H0V44" fill="none" stroke="var(--grid)"/></pattern></defs>
+            <rect width="700" height="430" fill="var(--c-bg)"/>
+            <rect width="700" height="430" fill="url(#malha)"/>
+            <g fill="none" stroke-width="1.8">
+              <path d="M112 150 C 220 172, 268 206, 330 228" stroke="var(--c-accent)" stroke-dasharray="6 5"/>
+              <path d="M588 150 C 480 172, 432 206, 372 228" stroke="var(--c-line)" stroke-dasharray="6 5"/>
+              <path d="M368 262 C 430 330, 500 344, 566 350" stroke="var(--c-line)" stroke-dasharray="2 6"/>
+            </g>
+            <g>
+              <rect x="52" y="108" width="116" height="66" fill="var(--c-bg)" stroke="var(--c-accent)"/>
+              <circle cx="70" cy="128" r="3.5" fill="var(--c-accent)"/>
+              <text x="84" y="133" font-family="Archivo, sans-serif" font-size="15" font-weight="700" fill="var(--c-text)">NORTE</text>
+              <text x="66" y="158" font-family="IBM Plex Mono, monospace" font-size="10" fill="var(--c-accent)" letter-spacing="1">10:00.001</text>
+            </g>
+            <g>
+              <rect x="532" y="108" width="116" height="66" fill="var(--c-bg)" stroke="var(--c-line)"/>
+              <circle cx="550" cy="128" r="3.5" fill="var(--c-muted)"/>
+              <text x="564" y="133" font-family="Archivo, sans-serif" font-size="15" font-weight="700" fill="var(--c-text)">SUL</text>
+              <text x="546" y="158" font-family="IBM Plex Mono, monospace" font-size="10" fill="var(--c-muted)" letter-spacing="1">10:00.002</text>
+            </g>
+            <g>
+              <circle cx="350" cy="244" r="62" fill="none" stroke="var(--accent-dim)" stroke-dasharray="3 7"/>
+              <circle cx="350" cy="244" r="44" fill="var(--c-bg)" stroke="var(--c-accent)"/>
+              <rect x="326" y="230" width="48" height="30" fill="var(--c-bg)" stroke="var(--c-accent)"/>
+              <path d="M333 230l6-9h22l6 9" fill="none" stroke="var(--c-accent)"/>
+              <rect x="342" y="238" width="15" height="9" fill="var(--c-accent)"/>
+              <circle cx="337" cy="262" r="4.5" fill="var(--c-bg)" stroke="var(--c-accent)"/>
+              <circle cx="363" cy="262" r="4.5" fill="var(--c-bg)" stroke="var(--c-accent)"/>
+              <text x="350" y="330" text-anchor="middle" font-family="IBM Plex Mono, monospace" font-size="11" fill="var(--c-accent)" letter-spacing="2">V-01 · LOCK OBTIDO</text>
+            </g>
+            <g opacity=".65">
+              <rect x="552" y="330" width="42" height="24" fill="var(--c-bg)" stroke="var(--c-line)"/>
+              <path d="M559 330l5-7h22l5 7" fill="none" stroke="var(--c-line)"/>
+              <text x="573" y="374" text-anchor="middle" font-family="IBM Plex Mono, monospace" font-size="10" fill="var(--c-muted)" letter-spacing="1.2">V-02 · PRÓXIMA</text>
+            </g>
+          </svg>
+          <div class="stamp">
+            <div class="stamp__l">Chave de lock</div>
+            <div class="stamp__v">lock:viatura:{id}</div>
+            <div class="stamp__d">TTL 5000 ms</div>
+          </div>
+        </div>
+        <p class="figure__cap">FIG. 01 / DUAS REQUISIÇÕES, UMA POSSE</p>
+      </div>
+    </div>
+
+    <div class="proof reveal">
+      <div class="proof__row">
+        <div><div class="proof__n">2 → 1</div><div class="proof__t">Mutations simultâneas</div><div class="proof__d">Uma vence, no teste informado.</div></div>
+        <div><div class="proof__n">0</div><div class="proof__t">Duplicidades</div><div class="proof__d">Resultado informado, não reexecutado aqui.</div></div>
+        <div><div class="proof__n">5000<span style="font-size:.5em"> ms</span></div><div class="proof__t">TTL do lock</div><div class="proof__d">Liberação automática da posse.</div></div>
+      </div>
+      <p class="proof__note">Receber. Enfileirar. Travar. Despachar.</p>
+    </div>
+  </div>
+</section>
+
+<!-- 01 PROBLEMA -->
+<section class="sec" id="problema" aria-labelledby="h-01">
+  <div class="wrap">
+    <div class="sec__head">
+      <div>
+        <p class="eyebrow-num"><span>01</span> O problema</p>
+        <h2 id="h-01">Um recurso físico. <em>Duas mãos.</em></h2>
+      </div>
+      <div class="sec__intro"><p><strong>Como alocar a viatura mais próxima exatamente uma vez, com centrais independentes e falhas parciais?</strong></p></div>
+    </div>
+
+    <div class="cards3 reveal">
+      <article class="card">
+        <svg class="card__ic" width="26" height="26" viewBox="0 0 26 26" fill="none" aria-hidden="true"><rect x="1" y="4" width="24" height="16" stroke="currentColor"/><path d="M8 24h10M13 20v4" stroke="currentColor"/><circle cx="7" cy="12" r="2" fill="currentColor"/></svg>
+        <p class="card__l">01</p>
+        <h3>A central abre.</h3>
+        <p>A resposta volta na hora, antes de qualquer alocação.</p>
+        <p class="card__stack">React + Apollo Client / JWT</p>
+      </article>
+      <article class="card">
+        <svg class="card__ic" width="26" height="26" viewBox="0 0 26 26" fill="none" aria-hidden="true"><path d="M2 7h22M2 13h22M2 19h22" stroke="currentColor"/><rect x="5" y="4" width="6" height="6" fill="currentColor"/></svg>
+        <p class="card__l">02</p>
+        <h3>O stream segura.</h3>
+        <p>Se o despacho cai, o chamado fica retido — não se perde.</p>
+        <p class="card__stack">Redis Streams / consumer group</p>
+      </article>
+      <article class="card">
+        <svg class="card__ic" width="26" height="26" viewBox="0 0 26 26" fill="none" aria-hidden="true"><rect x="4" y="11" width="18" height="13" stroke="currentColor"/><path d="M8 11V7a5 5 0 0110 0v4" stroke="currentColor"/><circle cx="13" cy="17" r="2" fill="currentColor"/></svg>
+        <p class="card__l">03</p>
+        <h3>O lock decide.</h3>
+        <p>Quem não obtém a posse vai para a próxima viatura.</p>
+        <p class="card__stack">NestJS + Prisma / SET NX PX</p>
+      </article>
+    </div>
+  </div>
+</section>
+
+<!-- 02 FLUXO ANIMADO -->
+<section class="sec" id="fluxo" aria-labelledby="h-02">
+  <div class="wrap">
+    <div class="sec__head">
+      <div>
+        <p class="eyebrow-num"><span>02</span> O fluxo</p>
+        <h2 id="h-02">Do chamado ao <em>despacho.</em></h2>
+      </div>
+      <div class="sec__intro"><p>Cinco etapas, em loop. <strong>A viatura só muda de estado depois do lock.</strong></p></div>
+    </div>
+
+    <div class="board reveal">
+      <div class="board__grid">
+        <div class="st" style="--i:0">
+          <svg class="st__ic" width="28" height="28" viewBox="0 0 28 28" fill="none" aria-hidden="true"><rect x="2" y="5" width="24" height="16" stroke="currentColor"/><path d="M9 25h10" stroke="currentColor"/><circle cx="8" cy="13" r="2.4" fill="currentColor"/></svg>
+          <p class="st__t">Central</p>
+          <p class="st__d">abre o chamado</p>
+          <span class="st__chip">Recebida</span>
+        </div>
+        <div class="conn" style="--i:0"><span class="conn__l"></span><span class="conn__d"></span></div>
+
+        <div class="st" style="--i:1">
+          <svg class="st__ic" width="28" height="28" viewBox="0 0 28 28" fill="none" aria-hidden="true"><circle cx="14" cy="6" r="3.2" stroke="currentColor"/><circle cx="6" cy="22" r="3.2" stroke="currentColor"/><circle cx="22" cy="22" r="3.2" stroke="currentColor"/><path d="M14 9v5m0 0l-6 5m6-5l6 5" stroke="currentColor"/></svg>
+          <p class="st__t">Gateway</p>
+          <p class="st__d">valida e roteia</p>
+          <span class="st__chip">Supergraph</span>
+        </div>
+        <div class="conn" style="--i:1"><span class="conn__l"></span><span class="conn__d"></span></div>
+
+        <div class="st" style="--i:2">
+          <svg class="st__ic" width="28" height="28" viewBox="0 0 28 28" fill="none" aria-hidden="true"><path d="M2 8h24M2 14h24M2 20h24" stroke="currentColor"/><rect x="5" y="5" width="6" height="6" fill="currentColor"/></svg>
+          <p class="st__t">Stream</p>
+          <p class="st__d">grava o evento</p>
+          <span class="st__chip">Fila</span>
+        </div>
+        <div class="conn" style="--i:2"><span class="conn__l"></span><span class="conn__d"></span></div>
+
+        <div class="st" style="--i:3">
+          <svg class="st__ic" width="28" height="28" viewBox="0 0 28 28" fill="none" aria-hidden="true"><rect x="5" y="12" width="18" height="12" stroke="currentColor"/><path d="M9 12V8a5 5 0 0110 0v4" stroke="currentColor"/><circle cx="14" cy="18" r="2" fill="currentColor"/></svg>
+          <p class="st__t">Lock</p>
+          <p class="st__d">uma posse por viatura</p>
+          <span class="st__chip">Processando</span>
+        </div>
+        <div class="conn" style="--i:3"><span class="conn__l"></span><span class="conn__d"></span></div>
+
+        <div class="st" style="--i:4">
+          <svg class="st__ic" width="28" height="28" viewBox="0 0 28 28" fill="none" aria-hidden="true"><rect x="4" y="12" width="20" height="10" stroke="currentColor"/><path d="M8 12l3-5h6l3 5" stroke="currentColor"/><circle cx="9" cy="23" r="2.4" stroke="currentColor"/><circle cx="19" cy="23" r="2.4" stroke="currentColor"/></svg>
+          <p class="st__t">Viatura</p>
+          <p class="st__d">acionada e publicada</p>
+          <span class="st__chip">Despachada</span>
+        </div>
+      </div>
+
+      <div class="board__cap">
+        <div class="cap" style="--i:0"><div class="cap__n">01</div><div class="cap__t">Resposta imediata: o operador não espera a busca.</div></div>
+        <div class="cap" style="--i:1"><div class="cap__n">02</div><div class="cap__t">Um endpoint só, com JWT validado na entrada.</div></div>
+        <div class="cap" style="--i:2"><div class="cap__n">03</div><div class="cap__t">Evento durável: se o despacho cair, ele espera.</div></div>
+        <div class="cap" style="--i:3"><div class="cap__n">04</div><div class="cap__t">Sem posse, o sistema tenta a próxima viatura.</div></div>
+        <div class="cap" style="--i:4"><div class="cap__n">05</div><div class="cap__t">O painel atualiza sozinho, sem recarregar.</div></div>
+      </div>
+
+      <div class="lock">
+        <div class="lock__i" data-win="1"><span class="lock__sig">✓</span><span><b>CENTRAL NORTE</b> <span>— lock obtido, V-01 alocada</span></span></div>
+        <div class="lock__i"><span class="lock__sig">×</span><span><b>CENTRAL SUL</b> <span>— lock ocupado, segue para V-02</span></span></div>
+      </div>
+    </div>
+    <p class="figure__cap">FIG. 02 / CICLO DE UM CHAMADO — ANIMAÇÃO EM LOOP, NÃO TELEMETRIA DO SISTEMA</p>
+  </div>
+</section>
+
+<!-- 03 ARQUITETURA -->
+<section class="sec" id="arquitetura" aria-labelledby="h-03">
+  <div class="wrap">
+    <div class="sec__head">
+      <div>
+        <p class="eyebrow-num"><span>03</span> Arquitetura</p>
+        <h2 id="h-03">Dois serviços. <em>Um schema.</em></h2>
+      </div>
+      <div class="sec__intro"><p>Cada serviço é dono do seu banco. <strong>O cliente enxerga um endpoint só.</strong></p></div>
+    </div>
+
+    <div class="arch reveal">
+      <svg viewBox="0 0 900 460" role="img" aria-labelledby="fig3">
+        <title id="fig3">Painel e script de teste falam com o Gateway GraphQL, que federa os serviços de Ocorrências e Viaturas. Cada serviço grava no seu PostgreSQL; os dois trocam evento e lock com o Redis, no centro.</title>
+        <g font-family="IBM Plex Mono, monospace" font-size="10.5" fill="var(--c-muted)">
+          <!-- estrutura: clientes → gateway → serviços → dados -->
+          <g stroke="var(--c-line)" fill="none" stroke-width="1.4">
+            <path d="M200 72 V106 H450"/>
+            <path d="M700 72 V106 H450"/>
+            <path d="M450 106 V140"/>
+            <path d="M450 194 V228"/>
+            <path d="M450 228 H225 V256"/>
+            <path d="M450 228 H675 V256"/>
+            <path d="M225 310 V372"/>
+            <path d="M675 310 V372"/>
+          </g>
+          <!-- fluxo de dados: serviços ↔ Redis, e circuit breaker -->
+          <g stroke="var(--c-accent)" fill="none" stroke-width="1.3" stroke-dasharray="5 4">
+            <path d="M340 270 H560"/>
+            <path d="M340 294 H365 V395 H375"/>
+            <path d="M560 294 H535 V395 H525"/>
+          </g>
+          <text x="450" y="100" text-anchor="middle" letter-spacing="1">query · mutation · subscription</text>
+          <text x="450" y="219" text-anchor="middle" letter-spacing="1">federa subgraph</text>
+          <text x="450" y="264" text-anchor="middle" font-size="9" letter-spacing="1">circuit breaker</text>
+          <text x="372" y="349" font-size="9" letter-spacing=".5">XADD evento</text>
+          <text x="540" y="349" font-size="9" letter-spacing=".5">SET NX lock</text>
+
+          <!-- clientes -->
+          <rect x="90" y="24" width="220" height="48" rx="3" fill="var(--c-bg)" stroke="var(--c-line)"/>
+          <text x="200" y="45" text-anchor="middle" font-family="Archivo, sans-serif" font-size="13" font-weight="600" fill="var(--c-text)" letter-spacing="0">Painel administrativo</text>
+          <text x="200" y="61" text-anchor="middle" letter-spacing="1">Vite + React + TS</text>
+
+          <rect x="590" y="24" width="220" height="48" rx="3" fill="var(--c-bg)" stroke="var(--c-line)"/>
+          <text x="700" y="45" text-anchor="middle" font-family="Archivo, sans-serif" font-size="13" font-weight="600" fill="var(--c-text)" letter-spacing="0">Script de concorrência</text>
+          <text x="700" y="61" text-anchor="middle" letter-spacing="1">Node.js</text>
+
+          <!-- gateway -->
+          <rect x="340" y="140" width="220" height="54" rx="3" fill="var(--accent-ghost)" stroke="var(--c-accent)"/>
+          <text x="450" y="164" text-anchor="middle" font-family="Archivo, sans-serif" font-size="14" font-weight="700" fill="var(--c-text)" letter-spacing="0">Gateway GraphQL</text>
+          <text x="450" y="181" text-anchor="middle" fill="var(--c-accent)" letter-spacing="1">Apollo Federation</text>
+
+          <!-- serviços -->
+          <rect x="110" y="256" width="230" height="54" rx="3" fill="var(--c-bg)" stroke="var(--c-line)"/>
+          <text x="225" y="280" text-anchor="middle" font-family="Archivo, sans-serif" font-size="13" font-weight="600" fill="var(--c-text)" letter-spacing="0">Serviço de Ocorrências</text>
+          <text x="225" y="297" text-anchor="middle" letter-spacing="1">NestJS + Prisma</text>
+
+          <rect x="560" y="256" width="230" height="54" rx="3" fill="var(--c-bg)" stroke="var(--c-line)"/>
+          <text x="675" y="280" text-anchor="middle" font-family="Archivo, sans-serif" font-size="13" font-weight="600" fill="var(--c-text)" letter-spacing="0">Serviço de Viaturas</text>
+          <text x="675" y="297" text-anchor="middle" letter-spacing="1">NestJS + Prisma</text>
+
+          <!-- dados -->
+          <rect x="110" y="372" width="230" height="46" rx="3" fill="var(--surface)" stroke="var(--c-line)"/>
+          <text x="225" y="400" text-anchor="middle" letter-spacing="1">PostgreSQL · ocorrencias_db</text>
+
+          <rect x="560" y="372" width="230" height="46" rx="3" fill="var(--surface)" stroke="var(--c-line)"/>
+          <text x="675" y="400" text-anchor="middle" letter-spacing="1">PostgreSQL · viaturas_db</text>
+
+          <rect x="375" y="372" width="150" height="46" rx="3" fill="var(--c-bg)" stroke="var(--c-accent)"/>
+          <text x="450" y="393" text-anchor="middle" font-family="Archivo, sans-serif" font-size="13" font-weight="700" fill="var(--c-text)" letter-spacing="0">Redis</text>
+          <text x="450" y="409" text-anchor="middle" fill="var(--c-accent)" font-size="9" letter-spacing=".5">lock · stream · pub/sub</text>
+        </g>
+      </svg>
+    </div>
+    <p class="figure__cap">FIG. 03 / VISÃO DE SERVIÇOS — NÃO É TOPOLOGIA DE REDE NEM DIAGRAMA DE DEPLOY</p>
+
+    <div class="contract">
+      <div>
+        <h3>O dado chega. A ambiguidade, <em>não.</em></h3>
+        <ul class="rules">
+          <li><b>tipo</b> · String! · lista fechada</li>
+          <li><b>prioridade</b> · Int! · de 1 a 5</li>
+          <li><b>latitude / longitude</b> · Float! · validadas</li>
+          <li><b>eventId</b> · uuid · chave de idempotência</li>
+        </ul>
+        <a class="link-arrow" href="#decisoes">Decisões por trás →</a>
+      </div>
+      <div>
+        <div class="code">
+          <div class="code__bar"><span class="micro">Contrato de entrada</span><button class="hdr__cta btn--sm" id="btn-copy">Copiar</button></div>
+<pre id="snippet"><code>mutation {
+  <b>abrirOcorrencia</b>(input: {
+    tipo: "ASSALTO"
+    prioridade: 1
+    latitude: -23.5505
+    longitude: -46.6333
+  }) { id status }   <b># RECEBIDA</b>
+}</code></pre>
+        </div>
+        <p class="figure__cap">Representação didática, não transcrição do repositório.</p>
+      </div>
+    </div>
+  </div>
+</section>
+
+<!-- 04 DECISÕES -->
+<section class="sec" id="decisoes" aria-labelledby="h-04">
+  <div class="wrap">
+    <div class="sec__head">
+      <div>
+        <p class="eyebrow-num"><span>04</span> Decisões</p>
+        <h2 id="h-04">Cada operação escolhe <em>o seu lado.</em></h2>
+      </div>
+      <div class="sec__intro"><p>Abrir ocorrência prefere disponibilidade. <strong>Alocar viatura prefere consistência.</strong></p></div>
+    </div>
+
+    <div class="band"><span>Invariante explícita.</span><span>Falha observável.</span><span>Limite conhecido.</span></div>
+
+    <div class="dec reveal">
+      <div class="dec__i">
+        <div class="dec__n">01</div>
+        <h3>Prefere falhar a alocar duas vezes.</h3>
+        <p>Sem posse do lock, recua. Não garante que o TTL cubra todo o trabalho.</p>
+        <p class="dec__s">SET NX PX 5000</p>
+      </div>
+      <div class="dec__i">
+        <div class="dec__n">02</div>
+        <h3>Aceitar antes de entender.</h3>
+        <p>Responde <span class="mono">RECEBIDA</span> na hora. Isso não afirma que houve despacho.</p>
+        <p class="dec__s">XADD stream:ocorrencias</p>
+      </div>
+      <div class="dec__i">
+        <div class="dec__n">03</div>
+        <h3>Receber de novo. Gravar uma vez.</h3>
+        <p>Idempotência na persistência, não promessa de entrega exactly once.</p>
+        <p class="dec__s">eventId · XACK</p>
+      </div>
+      <div class="dec__i">
+        <div class="dec__n">04</div>
+        <h3>Falhar rápido para não falhar junto.</h3>
+        <p>Circuit breaker contém a cascata, mas não repõe o serviço que caiu.</p>
+        <p class="dec__s">opossum · backoff 200/400/800ms</p>
+      </div>
+    </div>
+
+    <div class="ev">
+      <div class="ev__h">
+        <span class="tag" style="color:var(--c-accent);border-color:var(--accent-dim)">Evidências</span>
+        <p>Resultados informados pelos documentos do projeto. Não reexecutados por esta página.</p>
+      </div>
+      <div class="ev__row">
+        <div class="ev__i"><div class="metric__n">2</div><div class="metric__c">mutations<br>simultâneas</div></div>
+        <div class="ev__i"><div class="metric__n">1</div><div class="metric__c">despacho<br>efetivado</div></div>
+        <div class="ev__i"><div class="metric__n">0</div><div class="metric__c">duplicidades<br>no teste</div></div>
+      </div>
+    </div>
+  </div>
+</section>
+
+<section class="close grid-bg" aria-labelledby="h-fim">
+  <div class="wrap">
+    <p class="close__band">Contratos explícitos. Falhas observáveis. Limites conhecidos.</p>
+    <h2 id="h-fim">O serviço cai.<br>O chamado <em>permanece.</em></h2>
+    <div class="cta-row">
+      <a class="btn" href="#fluxo">Rever o fluxo</a>
+      <a class="link-arrow" href="#decisoes">Ver as decisões →</a>
+    </div>
+    <p class="close__foot">Central → Gateway → Stream → Viatura</p>
+  </div>
+</section>
+
+</main>
+
+<footer class="ft grid-bg">
+  <div class="wrap ft__in">
+    <div class="brand">
+      <svg class="brand__mark" viewBox="0 0 32 32" fill="none" aria-hidden="true">
+        <rect x="1" y="1" width="30" height="30" stroke="var(--c-line)"/>
+        <path d="M1 11h30M1 21h30M11 1v30M21 1v30" stroke="var(--grid)"/>
+        <circle cx="16" cy="16" r="5" stroke="var(--c-accent)"/><circle cx="16" cy="16" r="1.8" fill="var(--c-accent)"/>
+      </svg>
+      <span><span class="brand__name">SDV</span><span class="brand__sub">Sistema de Despacho<br>de Viaturas</span></span>
+    </div>
+    <nav class="ft__links" aria-label="Rodapé">
+      <a href="#problema">01 Problema</a><a href="#fluxo">02 Fluxo</a><a href="#arquitetura">03 Arquitetura</a>
+      <a href="#decisoes">04 Decisões</a>
+      <a href="https://www.apollographql.com/docs/federation/" target="_blank" rel="noopener">Apollo Federation <span aria-hidden="true">↗</span></a>
+    </nav>
+    <p class="legal">2026 · Material de escopo acadêmico, derivado da documentação técnica, do relatório de planejamento e da apresentação do projeto SDV. Equipe: João Arthur, Felipe Henriques, Raíssa Quezia e Yuri Rebouças. “SDV” é a identidade conceitual do trabalho, não um produto em operação. Nenhum dado real de segurança pública foi usado.</p>
+    <button class="top-btn" id="btn-topo">↑ Voltar ao topo</button>
+  </div>
+</footer>
+
+<dialog id="guia" aria-labelledby="guia-t">
+  <div class="dlg__bar">
+    <h2 id="guia-t" style="font-size:1rem">Guia técnico</h2>
+    <button class="hdr__cta btn--sm" id="fechar-guia">Fechar</button>
+  </div>
+  <div class="dlg__body">
+    <ul>
+      <li>Monorepo: gateway, ocorrencias-service, viaturas-service, painel-frontend e script de concorrência.</li>
+      <li>Database-per-service; o vínculo entre domínios é lógico, por UUID.</li>
+      <li>Síncrono por GraphQL Federation; assíncrono por Redis Streams com consumer group.</li>
+      <li>CI em GitHub Actions: lint, testes, build e imagem publicada só em <span class="mono">main</span>.</li>
+    </ul>
+<pre class="tree">sdv/
+├── apps/
+│   ├── gateway/
+│   ├── ocorrencias-service/
+│   ├── viaturas-service/
+│   ├── painel-frontend/
+│   └── concurrency-test-script/
+├── packages/shared/
+└── docker-compose.yml</pre>
+    <p class="legal" style="margin:0">Estrutura declarada no relatório. Esta página não executa nem testa nada dela.</p>
+  </div>
+</dialog>
+
+<div class="toast" id="toast" role="status" data-on="0">Copiado</div>
+
+<script>
+'use strict';
+var $=function(s){return document.querySelector(s)};
+var $$=function(s){return Array.prototype.slice.call(document.querySelectorAll(s))};
+var reduz=window.matchMedia('(prefers-reduced-motion: reduce)').matches;
+
+var hdr=$('#hdr'),burger=$('#burger');
+burger.addEventListener('click',function(){
+  var o=hdr.getAttribute('data-open')==='1';
+  hdr.setAttribute('data-open',o?'0':'1');burger.setAttribute('aria-expanded',String(!o));
+});
+$$('#nav a').forEach(function(a){a.addEventListener('click',function(){hdr.setAttribute('data-open','0');burger.setAttribute('aria-expanded','false')})});
+
+var dlg=$('#guia');
+$('#abrir-guia').addEventListener('click',function(){dlg.showModal?dlg.showModal():dlg.setAttribute('open','')});
+$('#fechar-guia').addEventListener('click',function(){dlg.close?dlg.close():dlg.removeAttribute('open')});
+$('#btn-topo').addEventListener('click',function(){window.scrollTo({top:0,behavior:reduz?'auto':'smooth'})});
+document.addEventListener('keydown',function(e){
+  if(e.key!=='Escape')return;
+  hdr.setAttribute('data-open','0');burger.setAttribute('aria-expanded','false');
+});
+
+var bar=$('#progress');
+function prog(){var h=document.documentElement.scrollHeight-window.innerHeight;bar.style.width=(h>0?Math.min(100,window.scrollY/h*100):0)+'%'}
+window.addEventListener('scroll',prog,{passive:true});window.addEventListener('resize',prog);prog();
+
+if('IntersectionObserver' in window&&!reduz){
+  var io=new IntersectionObserver(function(es){es.forEach(function(e){if(e.isIntersecting){e.target.classList.add('is-in');io.unobserve(e.target)}})},{rootMargin:'0px 0px -10% 0px',threshold:.08});
+  $$('.reveal').forEach(function(el){io.observe(el)});
+}else{$$('.reveal').forEach(function(el){el.classList.add('is-in')})}
+
+if('IntersectionObserver' in window){
+  var links={};$$('#nav a').forEach(function(a){links[a.getAttribute('href').slice(1)]=a});
+  var io2=new IntersectionObserver(function(es){es.forEach(function(e){
+    if(!e.isIntersecting)return;
+    $$('#nav a').forEach(function(a){a.removeAttribute('aria-current')});
+    if(links[e.target.id])links[e.target.id].setAttribute('aria-current','true');
+  })},{rootMargin:'-45% 0px -50% 0px'});
+  Object.keys(links).forEach(function(id){var s=document.getElementById(id);if(s)io2.observe(s)});
+}
+
+var toast=$('#toast'),tt;
+function avisar(t){toast.textContent=t;toast.setAttribute('data-on','1');clearTimeout(tt);tt=setTimeout(function(){toast.setAttribute('data-on','0')},2000)}
+$('#btn-copy').addEventListener('click',function(){
+  var txt=$('#snippet').innerText;
+  function fb(){
+    var ta=document.createElement('textarea');ta.value=txt;ta.setAttribute('readonly','');
+    ta.style.position='fixed';ta.style.opacity='0';document.body.appendChild(ta);ta.select();
+    try{document.execCommand('copy');avisar('Contrato copiado')}catch(e){avisar('Não foi possível copiar')}
+    document.body.removeChild(ta);
+  }
+  if(navigator.clipboard&&navigator.clipboard.writeText){navigator.clipboard.writeText(txt).then(function(){avisar('Contrato copiado')},fb)}else{fb()}
+});
+</script>
+</body>
+</html>
