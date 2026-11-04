@@ -1,6 +1,6 @@
-# SDV — Plano de evolução operacional de UX, mapa, ocorrências e autenticação (v3.0)
+# SDV — Plano de evolução operacional de UX, mapa, ocorrências e autenticação (v3.1)
 
-**Status:** planejamento revisado a partir do código da Entrega Integrada v2 (ZIP anexado à conversa), não implementado neste PR.
+**Status:** planejamento v3.1 revisado a partir do código da Entrega Integrada v2 (ZIP anexado à conversa), não implementado neste PR.
 **Data:** 04/11/2026
 **Escopo:** painel exclusivamente ADMIN, múltiplas centrais via scripts, viaturas e movimento fictícios em ruas reais de Feira de Santana/BA, GraphQL Federation, Redis, PostgreSQL, AWS us-east-1, Single-AZ.
 **Objetivo:** tornar o SDV uma central operacional de despacho, sem perder as garantias de sistemas distribuídos.
@@ -240,3 +240,202 @@ A fase é considerada concluída apenas depois de:
 - OSM — Nominatim policy (autocomplete público proibido): https://operations.osmfoundation.org/policies/nominatim/
 - OWASP — Session Management: https://cheatsheetseries.owasp.org/cheatsheets/Session_Management_Cheat_Sheet
 - AWS CloudFront — Cookie forwarding: https://docs.aws.amazon.com/AmazonCloudFront/latest/DeveloperGuide/Cookies.html
+
+
+---
+
+# Aditivo v3.1 — Telemetria contínua, ETA, histórico auditável e redesign visual de alto contraste
+
+**Data:** 04/11/2026  
+**Estado:** requisitos e diagnóstico de código aprovados para planejamento; a implementação abaixo ainda não foi realizada.  
+**Compatibilidade:** complementa as fases 0–8 acima; resolve campos faltantes e modifica o motor de movimento para patrulhamento contínuo.
+
+## 14. Diagnóstico técnico dos campos vazios
+
+Auditoria realizada sobre **SDV_Entrega_Integrada_v2.zip**, não sobre uma aplicação executada. A branch main ainda contém documentos e apresentação, sem o backend publicado.
+
+| Campo reclamado | Causa verificada | Fonte no ZIP | Classificação |
+| --- | --- | --- | --- |
+| Último sinal de GPS | \`Viatura.atualizadoEm\` é \`@updatedAt\`, uma modificação genérica da entidade. O simulador atualiza esse valor ao mover viaturas despachadas, mas disponíveis não recebem heartbeat. Uma mudança de status também pode alterar esse valor. | \`viaturas-service/prisma/schema.prisma\`; \`gps-simulator/src/main.ts\` | Sem modelo de telemetria específico |
+| Chegada ao local com horário real | Quando \`progresso===1\`, o simulador atualiza \`Despacho.status = NO_LOCAL\` e \`Viatura.status = NO_LOCAL\`, emite \`VIATURA_CHEGOU\`, mas **não grava data de chegada**. O frontend renderiza apenas texto "Viatura posicionada no destino". | \`gps-simulator/src/main.ts\`; \`painel-frontend/src/App.tsx\` | Não persistido |
+| Dados completos de cada passo da timeline | Não há tabela de eventos da ocorrência/despacho. A timeline é sintetizada no React com \`criadoEm\`, \`despacho.criadoEm\` e \`ocorrencia.atualizadoEm\`. Este último é a última edição geral e não representa cada evento histórico. | \`ocorrencias-service/prisma/schema.prisma\`, \`App.tsx\` | Histórico de domínio ausente |
+| Ocorrências da viatura no dia | \`listarDespachos\` retorna até 400 linhas, sem filtro de período ou agregação por viatura; nenhuma query de contagem diária. | \`viaturas-service/src/main.ts\`, \`viaturas-service/src/schema.graphql\` | Query e indicador ausentes |
+| Desde quando opera | A entidade Viatura não possui turno, início do serviço ou sessões operacionais; \`criadoEm\` não é um substituto correto para início de turno. | \`viaturas-service/prisma/schema.prisma\` | Modelo ausente |
+| Duração / ETA | \`duracaoSegundos\` pode ser nulo até o simulador chamar OSRM **após** alocação; \`App.tsx\` apresenta "Calculando". Não há consulta de ETA na prévia da criação. | \`gps-simulator/src/main.ts\`, \`App.tsx\` | Dependência assíncrona e UX sem estado explícito |
+| Viaturas disponíveis paradas | O simulador consulta somente despachos \`CONFIRMADO\`/\`EM_DESLOCAMENTO\`; não há fluxo que atualize posições de \`Viatura.status=DISPONIVEL\`. | \`gps-simulator/src/main.ts\` | Patrulhamento não implementado |
+| Texto diminuto e pouco contraste | CSS usa corpo raiz 14 px, labels e detalhes frequentemente 9–11 px; cor secundária muito clara; há muitos rótulos monospace, versais e tracking. Apesar de \`DM Sans\`/\`Manrope\` já serem **sem serifa**, escala e estilo fazem o texto parecer pouco legível. | \`painel-frontend/src/style.css\` | Design tokens e densidade |
+
+**Regra:** nunca preencher dados inexistentes com valores estimados apresentados como históricos. Campos legados sem evidência mostram "Não registrado" com explicação.
+
+## 15. ETA desde a seleção da ocorrência
+
+**Nova query somente leitura** \`preverDespacho(latitude,longitude)\`, retornando:
+- \`calculadoEm\`, \`viaturaCandidataId\`, \`distanciaMetros\`, \`duracaoViariaSegundos\`, \`origemEstimativa\` (OSRM) e \`qualidadeEstimativa\` (ROTEAVEL/INDISPONIVEL).
+- A query calcula duração usando OSRM **Table Service** (matriz de viaturas elegíveis → ocorrência), podendo usar ranking Haversine como pré-filtro para reduzir custo. Não realiza reserva de viatura.
+- Tratar ponto fora de área, rota inacessível e falha OSRM sem criar falsa previsão. Exibir "Sem previsão" quando não houver viaturas.
+- Debounce no mapa: só recalcular depois que o usuário parar de mover pin/confirmar busca; cancelar resposta obsoleta.
+- Prévia mostra "Viatura provável", "Chegada estimada" e "Distância por rua", sempre com aviso de que o candidato pode mudar até o commit.
+
+**Após alocação:** persistir previsão inicial vinculada ao despacho e calcular geometria da rota da viatura realmente alocada. Guardar:
+- \`etaOriginalSegundos\`, \`previsaoGeradaEm\`, \`previsaoChegadaEm\`, \`distanciaInicialMetros\`, \`versaoPrevisao\`;
+- \`etaAtualSegundos\`, \`previsaoAtualizadaEm\` para atualizações derivadas da rota restante;
+- \`origemDados = SIMULACAO\` e \`fatorSimulacaoAplicado\` quando aplicável.
+
+**Dois relógios diferentes:**
+1. \`duracaoViariaSegundos\`: duração que o OSRM estima para a malha viária, sem previsão de trânsito ao vivo.
+2. \`tempoDecorridoRealSegundos\`: diferenças entre timestamps **efetivamente gravados pelo servidor** durante a execução, inclusive com a simulação acelerada.
+
+Quando o fator 12x estiver ligado, o ETA de chegada em tempo de parede terá de considerar o fator e as pausas, sem rotular duração simulada como tempo de atendimento real na cidade. Mostrar "Estimativa viária" e "Chegada prevista na simulação" separadamente quando a aceleração estiver ativa. Reestimar após alteração de fator, pausa ou desvio.
+
+## 16. Timestamps de chegada, atendimento e linha do tempo de verdade
+
+### Persistência canônica
+
+No banco **Viaturas** (dono da alocação):
+- \`Despacho.despachadoEm\` (pode inicialmente ser equivalente ao commit/criadoEm, mas persistido semanticamente),
+- \`Deslocamento.iniciadoEm\` ou \`Despacho.saidaEm\`,
+- \`Despacho.chegadaEm\` **TIMESTAMPTZ nullable**, preenchido exatamente uma vez, no **mesmo commit** que move o despacho a \`NO_LOCAL\`;
+- \`Despacho.concluidoEm\`, \`distanciaMetros\`, histórico de previsões se necessário;
+- Outbox \`VIATURA_CHEGOU\` incluindo \`eventId\`, \`despachoId\`, \`ocorrenciaId\`, \`viaturaId\`, \`chegadaEm\` e \`versao\`.
+
+No banco **Ocorrências** (dono do histórico da ocorrência):
+- Modelo \`EventoOcorrencia\`: \`id\`, \`ocorrenciaId\`, \`tipo\`, \`ocorridoEm\` (timestamp de origem), \`registradoEm\` (timestamp da ingestão), \`origemServico\`, \`eventIdOrigem\` UNIQUE, \`adminId\` opcional, \`centralId\` opcional, \`descricao\`, \`metadados\` JSON restrito.
+- Consumer idempotente recebe a Outbox, persiste \`EventoOcorrencia\` e atualiza projeção status; **nunca substitui \`chegadaEm\` pelo horário em que recebeu a mensagem**, mesmo sob atraso de rede ou reentrega.
+- Eventos de exemplo: OCORRENCIA_CRIADA, TRIAGEM_CONCLUIDA, VIATURA_DESPACHADA, ROTA_CALCULADA, DESLOCAMENTO_INICIADO, VIATURA_CHEGOU, ATENDIMENTO_CONCLUIDO, CANCELAMENTO_SOLICITADO, OCORRENCIA_CANCELADA, SINAL_PERDIDO/RESTABELECIDO (quando relevante). Histórico técnico interno continua separado da timeline operacional para evitar poluição.
+- Testar UPSERT/reentrega e consistência eventual entre bancos. Timestamps armazenados UTC e exibidos em **America/Bahia** com data e segundos.
+
+### Indicadores derivados, não preenchidos manualmente
+
+- \`tempoNaFilaSegundos = despachadoEm - criadoEm\`
+- \`tempoDeDeslocamentoObservado = chegadaEm - saidaEm\`
+- \`tempoAteChegada = chegadaEm - criadoEm\` (**tempo real decorrido da execução da simulação**, não tempo de uma ambulância real)
+- \`tempoAtendimentoObservado = concluidoEm - chegadaEm\`
+- \`erroPrevisaoSegundos = tempoDeDeslocamentoObservado - etaOriginalSegundosAjustadoAoFator\`; exibir contexto quando simulação for pausada/acelerada.
+
+Na interface, timeline mostra **data, hora: minuto: segundo**, autor/origem, viatura, ETA da etapa, tempo desde o passo anterior e metadados somente quando existirem. Nenhum timestamp derivado de \`atualizadoEm\` para retroagir eventos anteriores.
+
+## 17. Último sinal e estado operacional das viaturas
+
+### Campo certo, interpretação certa
+
+Criar em Viatura:
+- \`ultimoSinalEm\`: recebimento de telemetria/heartbeat efetivo;
+- \`ultimaPosicaoEm\`: momento em que a coordenada foi medida;
+- \`ultimoMovimentoEm\`: último deslocamento com distância observável;
+- \`velocidadeMps\`, \`direcaoGraus\`, \`versaoPosicao\`;
+- \`atualizadoEm\` permanece auditoria de alteração do registro, **não é a fonte de GPS**.
+
+Backend recebe heartbeat mesmo se veículo estiver estacionado. Exibir:
+- \`sinal OK\` se telemetria recente, \`Atrasado\` se ultrapassar limiar configurado, \`Sem sinal\` se exceder timeout;
+- horário absoluto: "Último sinal 15:21:07"; hora relativa: "há 4 segundos";
+- posição obsoleta permanece na última coordenada conhecida, com estilo específico; não inventar movimento se conexão estiver perdida.
+
+Limiar inicial proposto: warning com 10 s, offline com 30 s para cadência de 2 s (parametrizável). Diferenciar \`viatura disponível\` de \`GPS sem sinal\` e de \`patrulhamento pausado\`; GPS offline pode tornar viatura inelegível para despacho automático conforme política configurada, sem alterar status indevidamente.
+
+### Serviço operacional / turno
+
+Criar \`TurnoViatura\` (\`id\`, \`viaturaId\`, \`inicioEm\`, \`fimEm\`, \`iniciadoPor\` SCRIPT/SISTEMA/ADMIN, \`status\`). Nesta versão sem motorista: ativação de turno por seed/script ou comando administrativo já autorizado. \`operandoDesde\` = início do turno **ativo**, não criação do registro nem primeiro GPS. Se não existir turno, mostrar "Turno não iniciado" ou "Histórico indisponível"; não inventar.
+
+### Ocorrências da viatura no dia
+
+Não contar registros em memória nem depender da lista limitada a 400. Query dedicada \`estatisticasViatura(id,dataLocal)\` no serviço de Viaturas, com janela do dia em **America/Bahia**, convertida a UTC:
+- \`despachosIniciadosHoje\`: despachos confirmados na janela local;
+- \`atendimentosConcluidosHoje\`: despachos concluídos na janela;
+- \`tempoTotalEmDeslocamentoHoje\` somente por timestamps disponíveis;
+- \`operandoDesde\`, \`duracaoTurno\`, \`ultimoSinalEm\`, \`situacaoSinal\`.
+
+Se houver eventos cancelados, não agrupá-los como atendimentos concluídos. Paginação para histórico: \`despachosViatura(id,cursor,limit)\`.
+
+## 18. Viaturas livres patrulhando a cidade, 24/7 enquanto turno ativo
+
+**Nova regra obrigatória:** uma viatura \`DISPONIVEL\` permanece **em patrulhamento**, deslocando-se por ruas reais de Feira de Santana, com rota OSRM calculada entre pontos válidos. Uma viatura \`OCUPADA\` segue a rota da ocorrência e uma \`NO_LOCAL\` fica estacionada até encerramento.
+
+Não confundir a condição de disponibilidade (\`DISPONIVEL\`) com o modo de movimento (\`PATRULHAMENTO\`, \`DESLOCAMENTO_OCORRENCIA\`, \`PARADA\`). A viatura pode estar disponível enquanto patrulha.
+
+### Motor de patrulhamento
+
+- Introduzir \`Patrulha\` (ou \`TrajetoPatrulha\`) com \`viaturaId\`, \`rota\` GeoJSON/linhas OSRM, \`origem\`, \`destino\`, \`progresso\`, \`versao\`, \`inicioEm\`, \`fimEm\` e \`status\`.
+- Gerar destinos em zonas urbanas pré-aprovadas e roteáveis de Feira de Santana; snap à via, controle de área, velocidade e rejeição de rotas impossíveis. **Não** gerar ponto aleatório fora de vias, teletransporte ou trajetos em linha reta.
+- Ao concluir uma rota de ronda, gerar uma próxima rota a partir da posição atual. Para não sobrecarregar OSRM, usar cache de rotas e recalcular somente quando necessário.
+- Atualizar o PostgreSQL com CAS por \`versaoPosicao\` ou lease com fencing para impedir dois simuladores de avançarem o mesmo veículo em réplicas concorrentes.
+- **Transição atômica para despacho:** somente se \`Viatura.status = DISPONIVEL\`, reservar recurso e suspender patrulha no mesmo commit de viatura/despacho. O simulador de ronda usa UPDATE condicional status DISPONIVEL + versão para não continuar a mover um carro após ser despachado.
+- O despacho parte **da posição confirmada mais recente**, não da origem do seed ou do início do segmento de ronda. Pausas/falhas não podem redefinir coordenadas.
+- Após concluir atendimento e liberar viatura, iniciar nova rota de patrulha **da posição do encerramento**.
+- Em \`NO_LOCAL\`, exibir ícone parado e chegada com timestamp. Em \`DISPONIVEL\` + \`PATRULHAMENTO\`, exibir ícone móvel verde e "Em patrulha".
+- Em zoom geral, mostrar ícones de todas as viaturas, mas **não desenhar todas as rotas de patrulhamento simultaneamente**. Mostrar só trajetos ativos de ocorrências e rota da viatura selecionada, para não poluir o mapa.
+
+**Movimento visual:** MapLibre anima ícone SVG do carro usando \`requestAnimationFrame\`, interpolando de maneira suave **sobre a geometria OSRM**, rotacionando \`bearing\`. Telemetria continua discreta com timestamp/versionamento. Na perda de sinal, congelar o marcador depois da janela máxima de interpolação e sincronizar com estado canônico ao reconectar.
+
+## 19. Redesign — mais contraste, tipografia legível, mapa dominante, menos ruído
+
+Diagnóstico: \`DM Sans\` e \`Manrope\` no CSS **já são sans-serif**. O problema percebido vem principalmente de escala 9–11 px, rótulos todos em caixa alta/monoespaçados e textos cinza-claros, não da existência de serifa. Evitar aumentar simplesmente o número de cards.
+
+### Direção visual
+
+- **Fonte principal:** \`Inter\` (ou IBM Plex Sans) em todas as telas, sem mistura de famílias display. Fonte mono restrita a IDs, placas e dados técnicos; cabeçalhos em frase normal, sem tracking excessivo.
+- **Escala:** corpo 16 px desktop e 15–16 px mobile; labels secundários 13–14 px; tabela 14 px; inputs 15–16 px; título de página 26–30 px; títulos de painel 18–22 px; métricas 24–30 px. Evitar 9–11 px para texto funcional.
+- **Paleta inicial:** texto \`#172534\`, secundário \`#475569\`, fundo \`#EDF1F5\`, cards \`#FFFFFF\`, borda \`#BAC6D2\`, alerta \`#C83335\`, viatura livre \`#08735A\`, selecionado \`#235FA4\`. Validar contrastes reais em todas as combinações: WCAG AA >= 4.5:1 para texto normal e >= 3:1 para texto grande.
+- Mais contraste **sem virar um dashboard quase preto**: superfícies bem definidas, ações fortes, alerta vermelho só em prioridades e exceções. Ícones sempre com rótulo no painel.
+- MapLibre/MapTiler com estilo urbano de vias legíveis, densidade de POIs reduzida. Rota selecionada visualmente dominante; outras rotas discretas.
+- **Alto aproveitamento de tela:** topbar 56–64 px; sidebar compacta recolhível; mapa 65–72% da largura de trabalho, até o fim da viewport; painel de operação à direita com largura adaptativa ~320–400 px e scroll próprio.
+- KPIs **uma linha compacta**, no máximo 4–5 indicadores (ativas, aguardando, patrulhando/disponíveis, deslocando, sem sinal). Nada de banners, cards decorativos, fundos sem conteúdo ou duplicidade da tela "Mapa operacional".
+- **Hierarquia primeiro, detalhes depois:** lista lateral mostra código, prioridade, endereço curto, viatura e ETA; clique abre detalhe com timeline, rotas, SLA e histórico. Tooltip no mapa é resumo, não modal enorme.
+- Responsivo: mobile mapa ocupa maior parte da viewport, bottom sheet de ocorrências e ações persistentes; contraste e tipografia iguais.
+- Ajuste ao usuário: não auto-centrar a câmera a cada telemetria; oferecer controle "Seguir viatura" ativado manualmente.
+
+### Informações essenciais sempre à vista
+
+**Card da ocorrência em andamento**: identificador, prioridade/tipo, endereço, viatura, \`ETA restante\` (ou "Calculando / indisponível"), status e tempo desde a criação.
+
+**Detalhe da ocorrência**: ETA inicial, ETA atualizado, chegada real \`chegadaEm\`, tempo em fila, tempo em rota, duração total e timeline com segundos.
+
+**Detalhe da viatura**: placa, status + "Em patrulha" quando livre, último sinal absoluto e relativo, último movimento, turno iniciado às HH:mm:ss, ocorrências iniciadas/concluídas no dia, turno decorrido, posição atual e destino ativo.
+
+### Evitar dados demais
+
+Ocultar por padrão coordenadas, versões, clientRequestId, UUID completo e metadados JSON; manter aba "Dados técnicos" ou "Auditoria" para investigação. Usar skeleton com largura correta e mensagens de vazio **específicas** ("Sem dados de turno", "Aguardando primeira telemetria", "Rota indisponível"), nunca \`0\` ou \`—\` ambíguos para falta de informação.
+
+## 20. Plano de execução incremental (atualiza a seção 10)
+
+- **Fase 0 (P0):** versionar ZIP v2 em branch de código, testar build e reproduzir ausência de timestamps, contadores e movimento das viaturas livres.
+- **Fase 1 (P0):** persistência de sessão (conforme seção 8) + migrations compatíveis de \`chegadaEm\`, \`EventoOcorrencia\`, \`ultimoSinalEm\`, \`TurnoViatura\`, \`Patrulha\`.
+- **Fase 2 (P0):** novos eventos/outbox versionados, ETA preliminar + posterior à alocação, linha do tempo auditável e KPIs com fonte de dados real.
+- **Fase 3 (P0):** novo motor de patrulhamento das viaturas disponíveis com CAS, interrupção para despacho e retomada após encerramento.
+- **Fase 4 (P0):** MapLibre, tema de alto contraste, Inter, marcadores SVG de carro, animação fluida e UI map-first.
+- **Fase 5 (P0):** criação por busca/CEP/pin arrastável, prévia com ETA e confirmação explícita.
+- **Fase 6 (P1):** subscriptions incrementais, recálculo moderado de ETA, paginação, filtros e tela de detalhes do turno.
+- **Fase 7 (P0):** Playwright e integração Postgres/Redis/OSRM, teste de concorrência, relatório de eventos/latência, deploy Terraform em AWS us-east-1 após autorização.
+
+**Não** habilitar AWS paga nem declarar a aplicação pronta sem builds e testes executados.
+
+## 21. Critérios adicionais de aceite (v3.1)
+
+- **AC-ETA-01**: após confirmação de localização, aparece ETA preliminar via OSRM Table Service ou estado explícito "indisponível"; nenhuma reserva antecipada.
+- **AC-ETA-02**: viatura real alocada substitui a candidata preliminar, com ETA e rota correspondentes ao commit.
+- **AC-ETA-03**: ETA inicial permanece preservado para comparação, ETA restante muda com a posição, estado de sinal e fator de simulação.
+- **AC-TIME-01**: atingir 100% da rota grava \`chegadaEm\` no mesmo commit de \`NO_LOCAL\`, uma única vez.
+- **AC-TIME-02**: após falha/reentrega, todas as centrais mostram o **mesmo horário original de chegada**, não a hora de recebimento do evento.
+- **AC-TIME-03**: timeline mostra data/hora com segundos, ordem estável, origem e duração entre eventos conhecidos; não atribui dados ausentes à última atualização.
+- **AC-GPS-01**: last signal e last movement são campos distintos; viatura parada com heartbeat válido permanece sinal OK.
+- **AC-GPS-02**: sem sinal durante timeout, última coordenada fica congelada e alerta aparece no mapa, lista e detalhe.
+- **AC-FLEET-01**: estatísticas de hoje são calculadas por query em \`America/Bahia\`, distinguindo despacho confirmado, concluído e cancelado.
+- **AC-FLEET-02**: \`operandoDesde\` vem do turno ativo e não é inferido de \`criadoEm\`.
+- **AC-PATROL-01**: após inicialização, todas as viaturas disponíveis com turno ativo patrulham ruas reais (movimento discreto no backend, fluido no navegador).
+- **AC-PATROL-02**: despachar durante patrulha suspende a ronda atomicamente e inicia rota a partir da última posição confirmada, sem teleportar.
+- **AC-PATROL-03**: concluir atendimento libera a viatura e retoma ronda a partir do local.
+- **AC-PATROL-04**: duas réplicas do simulador nunca movem/avançam a mesma viatura duplicadamente após disputa ou replay.
+- **AC-PATROL-05**: patrulhamento não exibe todas as rotas de ronda ao mesmo tempo, e toda viatura livre é elegível ao algoritmo de proximidade enquanto o sinal está válido.
+- **AC-UI-01**: em 1366×768 o mapa ocupa >= 65% da área operacional horizontal e o primeiro viewport não contém banner promocional.
+- **AC-UI-02**: textos funcionais não possuem fonte < 13px; corpos 15–16px, títulos 18px+, e contrastes WCAG AA são testados automaticamente.
+- **AC-UI-03**: painel inicial mostra no máximo cinco KPIs compactos; detalhe técnico só aparece quando solicitado.
+- **AC-UI-04**: todos os indicadores ausentes exibem motivo específico, nunca zero/número fabricado.
+- **AC-QA-01**: E2E valida ciclo prévia ETA → abrir → despachar → patrulha interrompida → chegadaEm → timeline → encerrar → retomar patrulha.
+- **AC-QA-02**: testes com simulação acelerada, pausa, perda de sinal, reentrega da chegada e múltiplas centrais não criam horários contraditórios.
+
+## 22. Fontes técnicas para implementação
+
+- OSRM Table Service (matriz ETA): https://project-osrm.org/docs/
+- MapLibre animation on route: https://maplibre.org/maplibre-gl-js/docs/examples/animate-a-point-along-a-route/
+- WCAG 2.2 text contrast: https://www.w3.org/TR/WCAG22/#contrast-minimum
+- Relatório SDV original (regras de exclusão mútua e Federation) e ZIP Entrega Integrada v2 (diagnóstico de código).
+
