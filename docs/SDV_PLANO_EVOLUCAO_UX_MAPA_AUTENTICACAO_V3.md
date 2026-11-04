@@ -439,3 +439,88 @@ Ocultar por padrão coordenadas, versões, clientRequestId, UUID completo e meta
 - WCAG 2.2 text contrast: https://www.w3.org/TR/WCAG22/#contrast-minimum
 - Relatório SDV original (regras de exclusão mútua e Federation) e ZIP Entrega Integrada v2 (diagnóstico de código).
 
+
+
+---
+
+# Decisão de UI v3.2 — MapLibre GL JS + MapTiler, mapa minimalista e explicativo
+
+**Decisão confirmada em 04/11/2026:** usar **MapLibre GL JS** como motor de renderização e **MapTiler** como provedor de tiles vetoriais e geocoding. Não usar Google Maps, Mapbox GL JS ou Leaflet como mapa principal. **Status: especificação confirmada, ainda não implementada no código da aplicação.**
+
+## Filosofia visual
+
+**Minimalista, mas não vazio.** Mostrar o mínimo necessário para responder, em até dois segundos: **onde está a ocorrência, qual viatura vai atender, como ela está se movendo, por onde vai e quanto falta**. O desenho não deve concorrer visualmente com esses dados.
+
+### Basemap
+
+1. Ponto de partida: **MapTiler Dataviz Light**, customizado no MapTiler para corrigir contraste baixo. Não utilizar cinza excessivamente claro como estilo final.
+2. Ruas locais: traçado cinza médio legível; avenidas principais: um pouco mais destacadas (sem amarelo de navegação rodoviária chamativo).
+3. Exibir nomes de ruas/avenidas e bairros quando zoom permitir. Evitar rótulos de estabelecimentos comerciais, pins de restaurantes, anúncios, monumentos irrelevantes e excesso de POIs.
+4. Parques/áreas verdes e vias principais com cores discretas, que preservem orientação. Mapa de Feira de Santana centralizado no perímetro urbano; não inventar malha.
+5. Não habilitar edifícios 3D ou relevo decorativo. Mapa base 2D com north-up por padrão; rotação controlada pelo usuário é opcional.
+6. Estilo alternativo **Dataviz Dark** ajustado para contraste, acionável no próprio mapa; salvar preferência em estado local não sensível. **Não** alterar a fonte de dados ou a lógica da rota ao alternar tema.
+7. Sempre manter atribuições obrigatórias do provedor/dados cartográficos.
+
+### Hierarquia das camadas
+
+**Fundo → ruas/nomes → rotas → veículos → ocorrências → seleção → controles/contexto**.
+
+- **Viaturas disponíveis patrulhando:** ícone SVG de carro, vista superior, cor verde escuro \`#08735A\`, heading e animação contínua pelas ruas. Não desenhar suas rotas de patrulhamento por padrão.
+- **Viaturas despachadas/em deslocamento:** carro azul escuro \`#235FA4\` ou cor semântica distinta; rota da ocorrência em azul intenso (espessura 4–5 px), trajeto percorrido em azul de baixa opacidade. Nunca depender só da cor: tooltip com estado.
+- **Viaturas no local:** carro imóvel, indicação "No local", horário real de chegada; não animar.
+- **Ocorrência ativa:** pin circular vermelho \`#C83335\` com centro branco/ícone de alerta; prioridade alta recebe anel discreto, não pulso interminável. Se clicada, mostrar rótulo curto e rota associada.
+- **Sinal atrasado:** última posição congelada + anel/estado "Sem sinal"; não interpolar dados inexistentes.
+- **Seleção:** rota escolhida em destaque; outras rotas suavizadas. Nenhum conjunto de trajetos formando emaranhado visual.
+- **Aglomerados em zoom distante:** cluster com número de viaturas/ocorrências; no zoom próximo separar ícones e permitir clique.
+- **Marcadores em movimento:** interpolação via requestAnimationFrame ao longo da geometria OSRM, respeitando timestamps e versões do backend, sem extrapolação após timeout.
+
+### Informação no mapa, sem sobrecarregar
+
+No zoom urbano, cada veículo mostra apenas **ícone**, e opcionalmente prefixo em seleção/hover. Não colocar placa completa, tempos e UUID sobre cada ícone o tempo todo.
+
+Ao **clicar numa viatura**: cartão compacto com prefixo, status ("Patrulhando", "Em deslocamento", "No local", "Sem sinal"), última telemetria, ocorrência vinculada e ETA se aplicável. Link/ação de abrir detalhe no painel lateral integrado.
+
+Ao **clicar numa ocorrência**: número, prioridade, endereço/bairro, viatura designada, status e ETA; timeline e metadados completos somente no painel lateral.
+
+**Legenda fixa discreta:** Verde = patrulhando/disponível; Azul = a caminho; Pin vermelho = ocorrência; Cinza = sem sinal. Não representar estados apenas por cor.
+
+**Controles reduzidos:** zoom (+/-), centralizar frota/Feira de Santana, camadas/tema, filtro de estados, "acompanhar viatura" (opt-in). Sem menu de debug nem simulador na home.
+
+### Layout
+
+- Mapa preenche **65–72% da largura útil** do workspace no desktop, com altura de viewport. Lista de ocorrências e viaturas em painel lateral (320–400 px), com scroll independente e sem overlay bloqueando o mapa.
+- Topbar compacta (56–64 px), 4–5 KPIs operacionais em faixa estreita, botão "Nova ocorrência".
+- Mobile: mapa dominante, bottom-sheet expansível para ocorrência/viatura e ações; pin/localização sempre visíveis ao criar.
+- Tipografia **Inter**: corpo 16 px, labels 13–14 px; alto contraste nos cards. Sem microtexto 9–11 px, textos decorativos em caixa alta ou versal excessivo.
+- Remover banner e CTA "Explorar mapa operacional" da home; a home **já é** o mapa.
+
+### Seleção da ocorrência (mesmo MapShell)
+
+- O mapa do formulário reutiliza o MapLibre, não um mapa alternativo. Busca MapTiler Geocoding, reconhecimento de CEP via ViaCEP (quando aplicável), com restrição/região de Feira de Santana.
+- Clique coloca **pin grande e imediatamente visível**; arrastar atualiza posição; geocodificação reversa exibe endereço (ou indica ausência).
+- Resumo de local selecionado e botão "Confirmar localização" antes de "Registrar ocorrência".
+- O pin aparece enquanto o operador ajusta a localização; **nenhuma ocorrência salva coordenada de seed/default**.
+- Após seleção, apresentar **ETA preliminar** por OSRM; ao despachar usar ETA da viatura efetivamente alocada.
+
+### Responsabilidades bem separadas
+
+- **MapLibre GL JS**: mapa vetorial, camadas, controles, ícones e animação.
+- **MapTiler**: estilos/tiles, busca e geocoding reverso.
+- **OSRM**: geometria, distância viária e duração/ETA. MapTiler não substitui a fonte canônica do roteamento.
+- **Backend PostgreSQL + Redis + GraphQL**: posição canônica, despacho, eventos e atualização em tempo real; a animação do browser não grava posição.
+- Credencial pública de tiles/geocoding é chave de API restrita por domínio e quota, via \`VITE_MAPTILER_API_KEY\`; não colocar segredos AWS ou tokens de backend no frontend. MapTiler exige contratação/conta própria, separada dos créditos AWS.
+
+### Critérios adicionais
+
+- AC-MAP-V3-01: todo mapa da central usa MapLibre GL JS + MapTiler Dataviz Light customizado, legível em Feira de Santana.
+- AC-MAP-V3-02: ruas principais, bairros e rótulos essenciais são legíveis sem excesso de POIs; estilo Dark é acessível e mantém símbolos/contrastes.
+- AC-MAP-V3-03: sem abrir cartões, é possível distinguir viatura livre, em deslocamento, no local e ocorrência ativa por símbolo e cor.
+- AC-MAP-V3-04: a 1366×768, mapa é o componente principal, sem banner e com painel integrado; a 390×844, pin e controles continuam visíveis.
+- AC-MAP-V3-05: viaturas patrulhando deslocam-se fluidamente e não mostram rotas de ronda em massa; a rota de um despacho selecionado é destacada.
+- AC-MAP-V3-06: seleção de ocorrência mostra marcador confirmado, endereço e ETA preliminar; não cria sem confirmação explícita.
+- AC-MAP-V3-07: seleção de veículo/ocorrência exibe cartão curto explicativo, sem sobrecarga de texto; detalhes profundos vão ao painel.
+- AC-MAP-V3-08: sem telemetria, carro não continua andando artificialmente; hora do último sinal fica explícita.
+- AC-MAP-V3-09: UI cumpre contraste WCAG AA para texto e distingue estados sem depender só de cor.
+- AC-MAP-V3-10: teste visual valida a hierarquia em zoom cidade, bairro e rua, com três despachos ativos, viaturas patrulhando e pin selecionado.
+
+**Referências:** https://www.maptiler.com/maps/dataviz/ ; https://docs.maptiler.com/sdk-js/api/map-styles/ ; https://maplibre.org/maplibre-gl-js/docs/ ; https://docs.maptiler.com/cloud/api/geocoding/
