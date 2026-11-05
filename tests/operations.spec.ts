@@ -29,8 +29,16 @@ for(const viewport of [{width:1366,height:768},{width:1440,height:900},{width:39
   await expect(page.locator('.location-preview p').nth(1)).not.toHaveText(oldPoint);
   await page.getByRole('button',{name:'Confirmar localização',exact:true}).click();await expect(submit).toBeEnabled();
   await page.screenshot({path:`test-results/pin-${viewport.width}.png`});
-  await submit.click();await expect(page.getByRole('dialog')).toHaveCount(0);
+  const previewPoint=await page.locator('.location-preview p').nth(1).innerText();
+  const creation=page.waitForResponse(r=>r.url().endsWith('/graphql')&&!!r.request().postData()?.includes('abrirOcorrencia'));
+  await submit.click();const response=await creation;const input=JSON.parse(response.request().postData()!).variables.input;
+  expect(previewPoint).toContain(input.latitude.toFixed(5)+', '+input.longitude.toFixed(5));expect(input.localConfirmado).toBe(true);expect(input.origemLocalizacao).toBe('PIN');
+  await expect(page.getByRole('dialog')).toHaveCount(0);
   await expect(page.locator('.operational-sidebar')).toContainText('Acidente de trânsito');
+  await page.locator('.operation-row').filter({hasText:'Acidente de trânsito'}).first().click();
+  await expect(page.locator('.timeline')).toContainText('Ocorrência registrada');
+  await expect(page.locator('.timeline')).toContainText('ADMIN');
+  await expect(page.locator('.timeline small').first()).toContainText(/\d{2}:\d{2}:\d{2}/);
  });
 }
 
