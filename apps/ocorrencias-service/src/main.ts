@@ -119,6 +119,8 @@ class OcorrenciaResolver {
 }
 @Resolver('EventoOcorrencia')
 class EventoResolver {
+ constructor(private readonly db:Database){}
+ @ResolveField('autor') async autor(@Parent() e:any){if(!e.adminId)return 'Sistema';const admin=await this.db.admin.findUnique({where:{id:e.adminId},select:{nome:true}});return admin?.nome??'Administrador não disponível';}
  @ResolveField('ocorridoEm') ocorridoEm(@Parent() e:any){return e.ocorridoEm.toISOString();}
  @ResolveField('registradoEm') registradoEm(@Parent() e:any){return e.registradoEm.toISOString();}
 }

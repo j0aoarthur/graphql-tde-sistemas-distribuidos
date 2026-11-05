@@ -5,7 +5,7 @@ import type {Snapshot} from './types';
 const API=import.meta.env.VITE_GRAPHQL_URL||'/graphql';
 const WS=import.meta.env.VITE_GRAPHQL_WS_URL||`${location.protocol==='https:'?'wss':'ws'}://${location.host}/subscriptions`;
 export const VEHICLE_FIELDS=`id placa status latitude longitude capacidade versao atualizadoEm ultimoSinalEm ultimaPosicaoEm ultimoMovimentoEm direcaoGraus versaoPosicao patrulhaRota patrulhaProgresso operandoDesde`;
-export const INCIDENT_FIELDS=`id versao centralId tipo prioridade latitude longitude status viaturaId criadoEm atualizadoEm descricao enderecoFormatado referencia eventos{id tipo ocorridoEm origemServico descricao}`;
+export const INCIDENT_FIELDS=`id versao centralId tipo prioridade latitude longitude status viaturaId criadoEm atualizadoEm descricao enderecoFormatado referencia eventos{id tipo ocorridoEm origemServico autor descricao}`;
 export const DISPATCH_FIELDS=`id versao ocorrenciaId viaturaId status distanciaMetros duracaoSegundos progresso rota simulacaoPausada criadoEm concluidoEm chegadaEm saidaEm etaOriginalSegundos`;
 export const SNAPSHOT_QUERY=`query PainelOperacional {me{id nome email centralId papel} listarCentrais{id nome codigo ativo} listarViaturas{${VEHICLE_FIELDS}} listarOcorrencias{${INCIDENT_FIELDS}} listarDespachos{${DISPATCH_FIELDS}} estadoSimulacao{fator pausada sinalIndisponivel}}`;
 export function reconcile(previous:Snapshot|null,next:Snapshot):Snapshot{if(!previous)return next;return {...next,listarViaturas:reconcileList(previous.listarViaturas,next.listarViaturas),listarOcorrencias:reconcileList(previous.listarOcorrencias,next.listarOcorrencias),listarDespachos:reconcileList(previous.listarDespachos,next.listarDespachos)};}
