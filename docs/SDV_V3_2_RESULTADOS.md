@@ -1,5 +1,7 @@
 # SDV v3.2 — matriz de aceite e evidências
 
+Esta matriz registra a entrega anterior. Para o refinamento de movimento, formulário e navegação, consulte os [resultados atualizados](SDV_REFINAMENTOS_V3_2_RESULTADOS.md).
+
 Data: 2026-11-05. Código validado: `16b5e4710a3d39d47e1dd8a06584f29238f2ffca`.
 
 **Resultado: 53 critérios PASSOU, 4 BLOQUEADO, 0 FALHOU.** Os 57 IDs vêm do plano v3.2. PASSOU significa execução no escopo indicado, incluindo fixtures explícitas; não significa homologação do provedor cartográfico real nem de infraestrutura AWS.

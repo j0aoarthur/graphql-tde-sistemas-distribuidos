@@ -1,0 +1,12 @@
+Código validado: 6e39dd9583d8882524030eef28f5cd269fb29e59
+2026-11-05: uma consulta gratuita ao OSRM público.
+Fonte: tests/fixtures/osrm-feira-centro.json (URL e atribuição OSM registrados).
+Distância OSRM: 1035.9 m
+Duração OSRM: 116.2 s
+Vértices da geometria: 38
+Replay com id osrm-real-feiracentro: 131 segundos físicos simulados
+Velocidade máxima: 35.57 km/h
+Progresso final: 1
+Velocidade no destino: 0 m/s
+Dentro do raio de patrulha simulado: sim
+Cobertura de toda a cidade: não homologada por este smoke.
