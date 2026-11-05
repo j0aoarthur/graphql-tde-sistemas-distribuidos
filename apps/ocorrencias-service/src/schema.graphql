@@ -1,8 +1,17 @@
 extend schema @link(url: "https://specs.apollo.dev/federation/v2.3", import: ["@key"])
 type Viatura @key(fields: "id", resolvable: false) { id: ID! }
 type Ocorrencia @key(fields: "id") {
+  versao: Int!
   id: ID!
   centralId: ID!
+  descricao: String!
+  enderecoFormatado: String!
+  bairro: String
+  cep: String
+  referencia: String
+  origemLocalizacao: String!
+  precisaoLocalizacao: String!
+  eventos: [EventoOcorrencia!]!
   tipo: String!
   prioridade: Int!
   latitude: Float!
@@ -16,7 +25,8 @@ type Ocorrencia @key(fields: "id") {
 type Admin { id: ID! nome: String! email: String! centralId: ID! papel: String! }
 type Central { id: ID! codigo: String! nome: String! ativo: Boolean! }
 type LoginResponse { accessToken: String! admin: Admin! }
-input AbrirOcorrenciaInput { tipo: String! prioridade: Int! latitude: Float! longitude: Float! clientRequestId: ID! }
+type EventoOcorrencia {id:ID! tipo:String! ocorridoEm:String! registradoEm:String! origemServico:String! adminId:ID centralId:ID descricao:String!}
+input AbrirOcorrenciaInput { descricao:String! enderecoFormatado:String! bairro:String cep:String numero:String complemento:String referencia:String observacoes:String origemLocalizacao:String! precisaoLocalizacao:String! localConfirmado:Boolean!  tipo: String! prioridade: Int! latitude: Float! longitude: Float! clientRequestId: ID! }
 type Query {
   me: Admin!
   listarCentrais: [Central!]!
@@ -27,5 +37,5 @@ type Mutation {
   login(email: String!, senha: String!): LoginResponse!
   abrirOcorrencia(input: AbrirOcorrenciaInput!): Ocorrencia!
   encerrarOcorrencia(id: ID!): Ocorrencia!
-  cancelarOcorrencia(id: ID!): Ocorrencia!
+  cancelarOcorrencia(id: ID!, motivo:String!): Ocorrencia!
 }

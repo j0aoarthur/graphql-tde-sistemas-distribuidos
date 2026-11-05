@@ -12,6 +12,10 @@
     "./route": {
       "types": "./route.d.ts",
       "default": "./route.cjs"
+    },
+    "./state": {
+      "types": "./state.d.ts",
+      "default": "./state.cjs"
     }
   }
 }

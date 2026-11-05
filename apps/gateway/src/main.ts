@@ -55,10 +55,13 @@ async function bootstrap(){
   });
   app.enableCors({origin:(process.env.FRONTEND_ORIGIN??'http://localhost:5173').split(',')});
   const wss=new WebSocketServer({server:app.getHttpServer(),path:'/subscriptions'});
-  const serverCleanup=useServer({schema,onConnect:(ctx)=>{
+  const expiryTimers=new WeakMap<object,ReturnType<typeof setTimeout>>();
+  const serverCleanup=useServer({schema,onClose:(ctx)=>{const timer=expiryTimers.get(ctx.extra.socket);if(timer)clearTimeout(timer);},onConnect:(ctx)=>{
     const auth=String(ctx.connectionParams?.authorization??'').replace(/^Bearer\s+/i,'');
     const claim=jwt.verify(auth,process.env.JWT_SECRET!,{algorithms:['HS256']}) as jwt.JwtPayload;
-    if(claim.papel!=='ADMIN')throw Error('Forbidden');
+    if(claim.papel!=='ADMIN'||!claim.exp)throw Error('Forbidden');
+    const timer=setTimeout(()=>ctx.extra.socket.close(4403,'Credencial expirada'),Math.max(0,claim.exp*1000-Date.now()));
+    expiryTimers.set(ctx.extra.socket,timer);
   }},wss);
   app.enableShutdownHooks();
   process.once('SIGTERM',()=>{void serverCleanup.dispose();wss.close();});

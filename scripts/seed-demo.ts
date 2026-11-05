@@ -13,7 +13,9 @@ async function run(){
   await a.admin.upsert({where:{email},update:{senhaHash:hash,ativo:true},create:{centralId:central.id,nome:`ADMIN ${codigo}`,email,senhaHash:hash,papel:'ADMIN'}});
  }
  for(let i=0;i<coords.length;i++){
-  await b.viatura.upsert({where:{placa:`SDV${String(i+1).padStart(3,'0')}`},update:{},create:{placa:`SDV${String(i+1).padStart(3,'0')}`,latitude:coords[i][0],longitude:coords[i][1],status:'DISPONIVEL'}});
+  const v=await b.viatura.upsert({where:{placa:`SDV${String(i+1).padStart(3,'0')}`},update:{},create:{placa:`SDV${String(i+1).padStart(3,'0')}`,latitude:coords[i][0],longitude:coords[i][1],status:'DISPONIVEL'}});
+  const ativo=await b.turnoViatura.findFirst({where:{viaturaId:v.id,fimEm:null}});
+  if(!ativo)await b.turnoViatura.create({data:{viaturaId:v.id,iniciadoPor:'SCRIPT'}});
  }
  console.log('Seed idempotente: 2 centrais ADMIN e 12 viaturas fictícias em Feira de Santana.');
 }

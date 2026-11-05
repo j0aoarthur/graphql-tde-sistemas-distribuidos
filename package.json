@@ -24,13 +24,19 @@
     "dev:simulator": "npm run dev -w @sdv/simulator",
     "db:migrate": "npm run db:migrate -w @sdv/ocorrencias && npm run db:migrate -w @sdv/viaturas",
     "test:session": "node tests/session.mjs",
-    "test:e2e": "playwright test"
+    "test:e2e": "playwright test",
+    "lint": "eslint .",
+    "test:operations": "node tests/operations.mjs && node tests/race.mjs && node tests/metrics.mjs",
+    "test:recovery": "node tests/recovery.mjs"
   },
   "devDependencies": {
+    "@axe-core/playwright": "^4.14.0",
     "@playwright/test": "^1.64.1",
     "@types/node": "^22.15.0",
+    "@typescript-eslint/parser": "^8.72.1",
     "bcryptjs": "^2.4.3",
     "dotenv": "^16.4.7",
+    "eslint": "^10.14.0",
     "tsx": "^4.20.6",
     "typescript": "~5.9.3"
   }

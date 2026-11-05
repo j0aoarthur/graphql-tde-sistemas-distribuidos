@@ -15,10 +15,20 @@ model Viatura {
   capacidade    Int @default(1)
   versao        Int @default(0)
   atualizadoEm  DateTime @updatedAt
+  ultimoSinalEm DateTime? @db.Timestamptz(3)
+  ultimaPosicaoEm DateTime? @db.Timestamptz(3)
+  ultimoMovimentoEm DateTime? @db.Timestamptz(3)
+  direcaoGraus Float @default(0)
+  velocidadeMps Float @default(0)
+  versaoPosicao Int @default(0)
+  estadoSinal String @default("DESCONHECIDO")
+  turnos TurnoViatura[]
+  patrulha Patrulha?
   despachos     Despacho[]
   @@index([status])
 }
 model Despacho {
+  versao Int @default(0)
   id           String @id @default(uuid()) @db.Uuid
   ocorrenciaId String @unique @db.Uuid
   viaturaId    String @db.Uuid
@@ -32,6 +42,18 @@ model Despacho {
   progresso     Float @default(0)
   simulacaoPausada Boolean @default(false)
   rotaErro      String?
+  chegadaEm DateTime? @db.Timestamptz(3)
+  despachadoEm DateTime @default(now()) @db.Timestamptz(3)
+  saidaEm DateTime? @db.Timestamptz(3)
+  etaOriginalSegundos Float?
+  etaAtualSegundos Float?
+  previsaoChegadaEm DateTime? @db.Timestamptz(3)
+  previsaoAtualizadaEm DateTime? @db.Timestamptz(3)
+  fatorSimulacaoAplicado Float?
+  versaoPrevisao Int @default(0)
+  origemDados String @default("SIMULACAO")
+  previsaoGeradaEm DateTime? @db.Timestamptz(3)
+  distanciaInicialMetros Float?
   concluidoEm  DateTime?
   viatura      Viatura @relation(fields:[viaturaId],references:[id])
   @@index([viaturaId,status])
@@ -42,4 +64,25 @@ model Outbox {
   payload     Json
   criadoEm    DateTime @default(now())
   publicadoEm DateTime?
+}
+
+model TurnoViatura {
+ id String @id @default(uuid()) @db.Uuid
+ viaturaId String @db.Uuid
+ inicioEm DateTime @default(now()) @db.Timestamptz(3)
+ fimEm DateTime? @db.Timestamptz(3)
+ iniciadoPor String @default("SCRIPT")
+ viatura Viatura @relation(fields:[viaturaId],references:[id])
+}
+model Patrulha {
+ id String @id @default(uuid()) @db.Uuid
+ viaturaId String @unique @db.Uuid
+ rota Json?
+ progresso Float @default(0)
+ versao Int @default(0)
+ duracaoSegundos Float?
+ inicioEm DateTime @default(now()) @db.Timestamptz(3)
+ fimEm DateTime? @db.Timestamptz(3)
+ status String @default("ATIVA")
+ viatura Viatura @relation(fields:[viaturaId],references:[id])
 }

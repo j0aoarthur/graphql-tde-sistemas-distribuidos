@@ -2,7 +2,7 @@
 import Redis from 'ioredis';
 import { Pool } from 'pg';
 import { randomUUID } from 'node:crypto';
-const STREAM='sdv:ocorrencias', GROUP='sdv:dispatch', CONSUMER=`worker-${randomUUID()}`;
+const STREAM=process.env.NODE_ENV==='test'&&process.env.SDV_TEST_STREAM?process.env.SDV_TEST_STREAM:'sdv:ocorrencias', GROUP='sdv:dispatch', CONSUMER=`worker-${randomUUID()}`;
 const redis=new Redis(process.env.REDIS_URL??'redis://localhost:6379',{maxRetriesPerRequest:null});
 const pool=new Pool({connectionString:process.env.OCC_DATABASE_URL,max:5});
 const fleetPool=new Pool({connectionString:process.env.VIATURAS_DATABASE_URL,max:3});
@@ -13,7 +13,7 @@ async function publishOutbox() {
   const client=await pool.connect(); let rows:any[]=[];
   try {
     await client.query('BEGIN');
-    const res=await client.query(`SELECT id,tipo,payload FROM "Outbox" WHERE "publicadoEm" IS NULL AND ("lockedUntil" IS NULL OR "lockedUntil" < now()) ORDER BY "criadoEm" LIMIT 20 FOR UPDATE SKIP LOCKED`);
+    const res=await client.query(`SELECT id,tipo,payload,"criadoEm" FROM "Outbox" WHERE "publicadoEm" IS NULL AND ("lockedUntil" IS NULL OR "lockedUntil" < now()) ORDER BY "criadoEm" LIMIT 20 FOR UPDATE SKIP LOCKED`);
     rows=res.rows;
     for(const row of rows) await client.query(`UPDATE "Outbox" SET "lockedUntil"=now()+interval '30 seconds', "tentativas"="tentativas"+1 WHERE id=$1`,[row.id]);
     await client.query('COMMIT');
@@ -31,16 +31,22 @@ async function replayFleetOutbox(){
   const client=await fleetPool.connect();
   try {
     await client.query('BEGIN');
-    const {rows}=await client.query(`SELECT id,tipo,payload FROM "Outbox" WHERE "publicadoEm" IS NULL ORDER BY "criadoEm" LIMIT 20 FOR UPDATE SKIP LOCKED`);
+    const {rows}=await client.query(`SELECT id,tipo,payload,"criadoEm" FROM "Outbox" WHERE "publicadoEm" IS NULL ORDER BY "criadoEm" LIMIT 20 FOR UPDATE SKIP LOCKED`);
     for(const row of rows){
       const p=row.payload;
+      const projection=await pool.connect();
+      try{
+        await projection.query('BEGIN');
+        await projection.query(`INSERT INTO "EventoOcorrencia" (id,"ocorrenciaId",tipo,"ocorridoEm","registradoEm","origemServico","eventIdOrigem",descricao) VALUES(gen_random_uuid(),$1,$2,$3,now(),'VIATURAS',$4,$2) ON CONFLICT ("eventIdOrigem") DO NOTHING`,[p.ocorrenciaId,row.tipo,p.chegadaEm??p.ocorridoEm??row.criadoEm,row.id]);
       if(row.tipo==='DESPACHO_CONFIRMADO'){
-        await pool.query(`UPDATE "Ocorrencia" SET status='DESPACHADA',"viaturaId"=$2,"atualizadoEm"=now() WHERE id=$1 AND status IN ('RECEBIDA','AGUARDANDO_VIATURA')`,[p.ocorrenciaId,p.viaturaId]);
+        await projection.query(`UPDATE "Ocorrencia" SET versao=versao+1,status='DESPACHADA',"viaturaId"=$2,"atualizadoEm"=now() WHERE id=$1 AND status IN ('RECEBIDA','AGUARDANDO_VIATURA')`,[p.ocorrenciaId,p.viaturaId]);
       }else if(row.tipo==='VIATURA_CHEGOU'){
-        await pool.query(`UPDATE "Ocorrencia" SET status='EM_ATENDIMENTO',"atualizadoEm"=now() WHERE id=$1 AND status='DESPACHADA'`,[p.ocorrenciaId]);
+        await projection.query(`UPDATE "Ocorrencia" SET versao=versao+1,status='EM_ATENDIMENTO',"atualizadoEm"=now() WHERE id=$1 AND status='DESPACHADA'`,[p.ocorrenciaId]);
       }else if(row.tipo==='DESPACHO_FINALIZADO'){
-        await pool.query(`UPDATE "Ocorrencia" SET status=$2,"atualizadoEm"=now() WHERE id=$1 AND status NOT IN ('CANCELADA','ENCERRADA')`,[p.ocorrenciaId,p.acao==='CANCELADO'?'CANCELADA':'ENCERRADA']);
+        await projection.query(`UPDATE "Ocorrencia" SET versao=versao+1,status=$2,"atualizadoEm"=now() WHERE id=$1 AND status NOT IN ('CANCELADA','ENCERRADA')`,[p.ocorrenciaId,p.acao==='CANCELADO'?'CANCELADA':'ENCERRADA']);
       }
+        await projection.query('COMMIT');
+      }catch(e){await projection.query('ROLLBACK');throw e;}finally{projection.release();}
       await client.query(`UPDATE "Outbox" SET "publicadoEm"=now() WHERE id=$1`,[row.id]);
       await emit('VIATURA',String(p.viaturaId||p.ocorrenciaId));
       await emit('OCORRENCIA',String(p.ocorrenciaId));
@@ -58,7 +64,7 @@ async function fleetAction(path:string,body:unknown){
 function decode(fields:string[]){const obj:Record<string,string>={};for(let i=0;i<fields.length;i+=2)obj[fields[i]]=fields[i+1];return obj;}
 async function close(ocorrenciaId:string,acao:'CANCELADO'|'CONCLUIDO'){
   await fleetAction('/finish',{ocorrenciaId,acao});
-  await pool.query(`UPDATE "Ocorrencia" SET status=$2,"atualizadoEm"=now() WHERE id=$1 AND status IN ('CANCELAMENTO_PENDENTE','ENCERRAMENTO_PENDENTE')`,[ocorrenciaId,acao==='CANCELADO'?'CANCELADA':'ENCERRADA']);
+  await pool.query(`UPDATE "Ocorrencia" SET versao=versao+1,status=$2,"atualizadoEm"=now() WHERE id=$1 AND status IN ('CANCELAMENTO_PENDENTE','ENCERRAMENTO_PENDENTE')`,[ocorrenciaId,acao==='CANCELADO'?'CANCELADA':'ENCERRADA']);
   await emit('OCORRENCIA',ocorrenciaId);
 }
 async function dispatch(ocorrenciaId:string,latitude:number,longitude:number){
@@ -67,8 +73,9 @@ async function dispatch(ocorrenciaId:string,latitude:number,longitude:number){
   const status=rows[0].status as string;
   if(['ENCERRADA','CANCELADA','ENCERRAMENTO_PENDENTE','CANCELAMENTO_PENDENTE','EM_ATENDIMENTO'].includes(status))return;
   const result=await fleetAction('/dispatch',{ocorrenciaId,latitude,longitude});
+  if(process.env.NODE_ENV==='test'&&process.env.SDV_TEST_CRASH==='AFTER_FLEET_COMMIT'&&result.status==='DESPACHADA')process.exit(86);
   if(result.status==='DESPACHADA' && result.viaturaId){
-    const updated=await pool.query(`UPDATE "Ocorrencia" SET status='DESPACHADA',"viaturaId"=$2,"atualizadoEm"=now() WHERE id=$1 AND status IN ('RECEBIDA','AGUARDANDO_VIATURA') RETURNING id`,[ocorrenciaId,result.viaturaId]);
+    const updated=await pool.query(`UPDATE "Ocorrencia" SET versao=versao+1,status='DESPACHADA',"viaturaId"=$2,"atualizadoEm"=now() WHERE id=$1 AND status IN ('RECEBIDA','AGUARDANDO_VIATURA') RETURNING id`,[ocorrenciaId,result.viaturaId]);
     if(!updated.rowCount){
       const latest=await pool.query(`SELECT status FROM "Ocorrencia" WHERE id=$1`,[ocorrenciaId]);
       if(['CANCELADA','CANCELAMENTO_PENDENTE','ENCERRADA','ENCERRAMENTO_PENDENTE'].includes(latest.rows[0]?.status)){
@@ -76,7 +83,7 @@ async function dispatch(ocorrenciaId:string,latitude:number,longitude:number){
       }
     }
   } else if(result.status==='SEM_VIATURA'){
-    await pool.query(`UPDATE "Ocorrencia" SET status='AGUARDANDO_VIATURA',"atualizadoEm"=now() WHERE id=$1 AND status='RECEBIDA'`,[ocorrenciaId]);
+    await pool.query(`UPDATE "Ocorrencia" SET versao=versao+1,status='AGUARDANDO_VIATURA',"atualizadoEm"=now() WHERE id=$1 AND status='RECEBIDA'`,[ocorrenciaId]);
   }else if(result.status!=='CANCELADO')throw Error('Resposta interna inesperada');
   await emit('OCORRENCIA',ocorrenciaId);
 }
@@ -84,6 +91,7 @@ async function processMessage(messageId:string,fields:string[]) {
   const event=decode(fields), p=JSON.parse(event.payload);
   if(event.tipo==='OCORRENCIA_RECEBIDA')await dispatch(p.ocorrenciaId,p.latitude,p.longitude);
   else if(event.tipo==='OCORRENCIA_FECHAR')await close(p.ocorrenciaId,p.acao);
+  if(process.env.NODE_ENV==='test'&&process.env.SDV_TEST_CRASH==='BEFORE_ACK')process.exit(87);
   await redis.xack(STREAM,GROUP,messageId);
 }
 async function retryWaiting(){
@@ -99,10 +107,10 @@ async function consume(){
     try {
       if(Date.now()-recovery>10000) {
         recovery=Date.now();
-        const claimed=await redis.xautoclaim(STREAM,GROUP,CONSUMER,30000,'0-0','COUNT',10) as any;
+        const claimed=await redis.xautoclaim(STREAM,GROUP,CONSUMER,process.env.NODE_ENV==='test'&&process.env.SDV_TEST_STREAM?20:30000,'0-0','COUNT',10) as any;
         for(const [id,fields] of claimed?.[1]??[]) {try{await processMessage(id,fields);}catch(e){console.error('Retomada',id,e);}}
       }
-      if(Date.now()-retry>15000){retry=Date.now();await retryWaiting();}
+      if(Date.now()-retry>15000&&!(process.env.NODE_ENV==='test'&&process.env.SDV_TEST_STREAM)){retry=Date.now();await retryWaiting();}
       const response=await redis.xreadgroup('GROUP',GROUP,CONSUMER,'COUNT',10,'BLOCK',2000,'STREAMS',STREAM,'>') as any;
       for(const [,messages] of response??[])for(const [id,fields] of messages){try{await processMessage(id,fields);}catch(e){console.error('Processamento',id,e);}}
     }catch(e){console.error('Consumer offline:',e);await sleep(1500);}
@@ -110,7 +118,7 @@ async function consume(){
 }
 async function main(){
   process.once('SIGTERM',()=>running=false);process.once('SIGINT',()=>running=false);
-  const publisher=(async()=>{while(running){try{await publishOutbox();await replayFleetOutbox();}catch(e){console.error('Outbox',e);}await sleep(1400);}})();
+  const publisher=(async()=>{while(running){try{await publishOutbox();if(!(process.env.NODE_ENV==='test'&&process.env.SDV_TEST_CRASH))await replayFleetOutbox();}catch(e){console.error('Outbox',e);}await sleep(1400);}})();
   await consume();await publisher;await Promise.all([redis.quit(),pool.end(),fleetPool.end()]);
 }
 main().catch(e=>{console.error(e);process.exitCode=1;});

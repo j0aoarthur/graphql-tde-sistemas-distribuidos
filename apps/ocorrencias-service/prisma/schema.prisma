@@ -26,9 +26,22 @@ model Admin {
   central     Central @relation(fields:[centralId],references:[id])
 }
 model Ocorrencia {
+  versao Int @default(0)
   id              String @id @default(uuid()) @db.Uuid
   centralId       String @db.Uuid
   clientRequestId String
+  descricao String
+  enderecoFormatado String @default("")
+  bairro String?
+  cep String?
+  numero String?
+  complemento String?
+  referencia String?
+  observacoes String?
+  origemLocalizacao String
+  precisaoLocalizacao String
+  localConfirmado Boolean @default(false)
+  eventos EventoOcorrencia[]
   tipo            String
   prioridade      Int
   latitude        Float
@@ -53,6 +66,8 @@ model Outbox {
 }
 
 model Sessao {
+  tokens SessaoToken[]
+  eventos EventoSessao[]
   id String @id @default(uuid()) @db.Uuid
   adminId String @db.Uuid
   tokenHash String @unique
@@ -62,4 +77,34 @@ model Sessao {
   revogadoEm DateTime?
   admin Admin @relation(fields: [adminId], references: [id], onDelete: Cascade)
   @@index([adminId])
+}
+
+model EventoOcorrencia {
+ id String @id @default(uuid()) @db.Uuid
+ ocorrenciaId String @db.Uuid
+ tipo String
+ ocorridoEm DateTime @db.Timestamptz(3)
+ registradoEm DateTime @default(now()) @db.Timestamptz(3)
+ origemServico String
+ eventIdOrigem String @unique
+ adminId String? @db.Uuid
+ centralId String? @db.Uuid
+ descricao String
+ metadados Json?
+ ocorrencia Ocorrencia @relation(fields:[ocorrenciaId],references:[id])
+ @@index([ocorrenciaId,ocorridoEm,id])
+}
+
+model SessaoToken {
+ tokenHash String @id
+ sessaoId String @db.Uuid
+ usadoEm DateTime @default(now()) @db.Timestamptz(3)
+ sessao Sessao @relation(fields:[sessaoId],references:[id],onDelete:Cascade)
+}
+model EventoSessao {
+ id String @id @default(uuid()) @db.Uuid
+ sessaoId String @db.Uuid
+ tipo String
+ ocorridoEm DateTime @default(now()) @db.Timestamptz(3)
+ sessao Sessao @relation(fields:[sessaoId],references:[id],onDelete:Cascade)
 }

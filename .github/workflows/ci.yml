@@ -18,6 +18,7 @@ jobs:
         with: {node-version: '22'}
       - run: npm install --no-audit --no-fund
       - run: npm run db:generate
+      - run: npm run lint
       - run: npm test
       - run: npm run build
   integration:
@@ -31,6 +32,8 @@ jobs:
       OCC_DATABASE_URL: postgresql://sdv:sdv_dev_only@127.0.0.1:5432/ocorrencias_db
       VIATURAS_DATABASE_URL: postgresql://sdv:sdv_dev_only@127.0.0.1:5432/viaturas_db
       REDIS_URL: redis://127.0.0.1:6379
+      OSRM_URL: http://127.0.0.1:5010
+      VITE_MAPTILER_API_KEY: test-only-fixture
       VIATURAS_INTERNAL_URL: http://127.0.0.1:4002/internal/dispatch
       OCCORRENCIAS_URL: http://127.0.0.1:4001/graphql
       VIATURAS_URL: http://127.0.0.1:4002/graphql
@@ -45,6 +48,8 @@ jobs:
       - name: Iniciar microsserviços e workers
         shell: bash
         run: |
+          node tests/fixtures/osrm.mjs > /tmp/osrm.log 2>&1 &
+          node apps/gps-simulator/dist/main.js > /tmp/simulator.log 2>&1 &
           node apps/ocorrencias-service/dist/main.js > /tmp/ocorrencias.log 2>&1 &
           node apps/viaturas-service/dist/main.js > /tmp/viaturas.log 2>&1 &
           node apps/dispatch-worker/dist/main.js > /tmp/worker.log 2>&1 &
@@ -55,17 +60,29 @@ jobs:
           done
           cat /tmp/{ocorrencias,viaturas,worker,gateway}.log
           exit 1
+      - run: npm run test:operations
+      - run: node tests/gps.mjs
       - run: npm run test:concurrency
+      - name: Falhas antes de ACK e após commit em Viaturas
+        run: |
+          pkill -9 -f '^node apps/dispatch-worker/dist/main.js' || true
+          SDV_WORKER_CONTROL=1 npm run test:recovery
+          node apps/dispatch-worker/dist/main.js > /tmp/worker.log 2>&1 &
       - run: npm run test:session
-      - name: E2E de sessão no navegador
+      - name: E2E v3.2 desktop, mobile e HTTPS local
         run: |
           npx playwright install --with-deps chromium
           npm run dev:frontend > /tmp/frontend.log 2>&1 &
-          npx playwright test tests/session.spec.ts --workers=1 --reporter=line
+          mkdir -p /tmp/sdv-tls
+          openssl req -x509 -newkey rsa:2048 -nodes -keyout /tmp/sdv-tls/key.pem -out /tmp/sdv-tls/cert.pem -days 1 -subj '/CN=localhost' >/tmp/tls.log 2>&1
+          NODE_ENV=production PORT=4011 FRONTEND_ORIGIN=https://localhost:5443 node apps/ocorrencias-service/dist/main.js >/tmp/auth-https.log 2>&1 &
+          node tests/fixtures/https-proxy.mjs >/tmp/https-proxy.log 2>&1 &
+          node tests/wait-services.mjs
+          npx playwright test --workers=1 --reporter=line
       - uses: actions/upload-artifact@v4
         if: always()
         with:
-          name: evidencias-sessao
+          name: evidencias-v3
           path: test-results/
 
       - if: failure()
