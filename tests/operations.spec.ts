@@ -15,17 +15,31 @@ for(const viewport of [{width:1366,height:768},{width:1440,height:900},{width:39
   await page.screenshot({path:`test-results/map-${viewport.width}.png`});
   await page.getByRole('button',{name:'Nova ocorrência',exact:true}).click();
   const submit=page.getByRole('button',{name:'Registrar ocorrência',exact:true});await expect(submit).toBeDisabled();
-  await page.getByLabel('Buscar endereço').fill('Rua de teste');await page.getByRole('button',{name:/Rua de teste.*Endereço aproximado/}).click();
+  await page.getByLabel('Buscar endereço').fill('Rua de teste');await page.getByRole('option',{name:/Rua de teste.*Endereço aproximado/}).click();
   await expect(page.getByLabel('Local selecionado')).toBeVisible();await expect(submit).toBeDisabled();
   await page.getByLabel('Descrição',{exact:true}).fill('Chamado fictício de teste v3.2');
   await page.getByRole('button',{name:'Confirmar localização',exact:true}).click();await expect(submit).toBeEnabled();
   await expect(page.locator('.location-preview')).toContainText(/Estimativa viária|ETA indisponível/);
   await page.getByRole('button',{name:'Ajustar localização',exact:true}).click();await expect(submit).toBeDisabled();
-  await page.getByLabel('Buscar endereço').fill('44001000');await page.getByRole('button',{name:/Rua de teste.*CEP aproximado/}).click();await expect(page.locator('.location-preview')).toContainText('Local aproximado');
+  await page.getByLabel('Buscar endereço').fill('44001000');await page.getByRole('option',{name:/Rua de teste.*CEP aproximado/}).click();await expect(page.locator('.location-preview')).toContainText('Local aproximado');
   const canvas=page.getByRole('dialog').locator('.maplibregl-canvas');await canvas.click({position:{x:140,y:150}});await expect(page.getByLabel('Local selecionado')).toBeVisible();
+  await expect(page.getByRole('button',{name:'Confirmar localização',exact:true})).toBeEnabled();
+  const oldPoint=await page.locator('.location-preview p').nth(1).innerText();
+  await page.getByLabel('Local selecionado').dragTo(canvas,{targetPosition:{x:220,y:170}});
+  await expect(page.locator('.location-preview p').nth(1)).not.toHaveText(oldPoint);
   await page.getByRole('button',{name:'Confirmar localização',exact:true}).click();await expect(submit).toBeEnabled();
   await page.screenshot({path:`test-results/pin-${viewport.width}.png`});
   await submit.click();await expect(page.getByRole('dialog')).toHaveCount(0);
   await expect(page.locator('.operational-sidebar')).toContainText('Acidente de trânsito');
  });
 }
+
+test('falha de busca permite pin e referência; cancelar não cria ocorrência',async({page})=>{
+ await fixtures(page);await page.route('https://api.maptiler.com/geocoding/**',r=>r.fulfill({status:503,json:{error:'fixture unavailable'}}));
+ let creates=0;page.on('request',r=>{if(r.url().endsWith('/graphql')&&r.postData()?.includes('abrirOcorrencia'))creates++;});
+ await page.goto('http://localhost:5173');await page.getByLabel('Senha de acesso').fill(process.env.DEMO_ADMIN_PASSWORD!);await page.getByRole('button',{name:'Acessar central'}).click();await page.getByRole('button',{name:'Nova ocorrência',exact:true}).click();
+ await page.getByLabel('Buscar endereço').fill('Endereço indisponível');await expect(page.getByRole('status').filter({hasText:'Busca indisponível'})).toBeVisible();
+ await page.getByRole('dialog').locator('.maplibregl-canvas').click({position:{x:140,y:150}});await page.getByLabel('Referência',{exact:true}).fill('Referência manual de teste');await page.getByLabel('Descrição',{exact:true}).fill('Chamado fictício em teste');
+ await page.getByRole('button',{name:'Confirmar localização',exact:true}).click();await expect(page.getByRole('button',{name:'Registrar ocorrência',exact:true})).toBeEnabled();
+ await page.getByRole('button',{name:'Cancelar',exact:true}).click();await expect(page.getByRole('dialog')).toHaveCount(0);expect(creates).toBe(0);
+});

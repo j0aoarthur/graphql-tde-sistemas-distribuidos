@@ -13,5 +13,7 @@ try{
  const after4=await read('2026-11-04'),after5=await read('2026-11-05');
  assert.equal(after4.despachosIniciadosHoje,before4.despachosIniciadosHoje+1);assert.equal(after4.atendimentosConcluidosHoje,before4.atendimentosConcluidosHoje+1);assert.equal(after4.canceladosHoje,before4.canceladosHoje);
  assert.equal(after5.despachosIniciadosHoje,before5.despachosIniciadosHoje+1);assert.equal(after5.canceladosHoje,before5.canceladosHoje+1);assert.equal(after5.atendimentosConcluidosHoje,before5.atendimentosConcluidosHoje);
- console.log('PASSOU: fronteira 02:59/03:00 UTC em America/Bahia e distinção entre concluídos e cancelados via GraphQL/PostgreSQL');
+ const first=(await gql('query($id:ID!){despachosViatura(id:$id,limit:1){id}}',{id:v},token)).despachosViatura;
+ const next=(await gql('query($id:ID!,$c:ID!){despachosViatura(id:$id,cursor:$c,limit:1){id}}',{id:v,c:first[0].id},token)).despachosViatura;assert.equal(first.length,1);assert.equal(next.length,1);assert.notEqual(first[0].id,next[0].id);
+ console.log('PASSOU: fronteira 02:59/03:00 UTC em America/Bahia e distinção entre concluídos e cancelados e paginação por cursor via GraphQL/PostgreSQL');
 }finally{for(const id of ids)await p.query('DELETE FROM "Despacho" WHERE id=$1',[id]);await p.end();}
