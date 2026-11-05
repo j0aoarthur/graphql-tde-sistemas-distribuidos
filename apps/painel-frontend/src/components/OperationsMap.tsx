@@ -19,7 +19,7 @@ function car(color:string){return `<svg viewBox="0 0 44 72" width="32" height="5
 export function OperationsMap({vehicles,incidents,dispatches,selectedId,onSelect,onPick,pickMode=false,focus=null,showAllRoutes=false,zoom=13}:{vehicles:Vehicle[];incidents:Incident[];dispatches:Dispatch[];selectedId?:string;onSelect?:(kind:'vehicle'|'incident',id:string)=>void;onPick?:(point:LatLon)=>void;pickMode?:boolean;focus?:LatLon|null;showAllRoutes?:boolean;zoom?:number}){
  const root=useRef<HTMLDivElement>(null),map=useRef<GLMap|null>(null),callbacks=useRef({onSelect,onPick,pickMode});callbacks.current={onSelect,onPick,pickMode};
  const markers=useRef(new Map<string,{marker:maplibregl.Marker;progress:number;route:string|null;frame:number;version:number}>());
- const picker=useRef<maplibregl.Marker|null>(null);
+ const picker=useRef<maplibregl.Marker|null>(null),styleReady=useRef(false);
  const[following,setFollowing]=useState(false),[age,setAge]=useState(0);
  useEffect(()=>{const timer=setInterval(()=>setAge(n=>n+1),2000);return()=>clearInterval(timer);},[]);
  const[ready,setReady]=useState(0),[dark,setDark]=useState(false),[error,setError]=useState('');
@@ -33,13 +33,13 @@ export function OperationsMap({vehicles,incidents,dispatches,selectedId,onSelect
   m.on('moveend',()=>{if(root.current)root.current.dataset.zoom=String(m.getZoom());});
   m.on('dragstart',()=>setFollowing(false));
   m.addControl(new maplibregl.NavigationControl({showCompass:false}),'bottom-right');
-  m.on('style.load',()=>{for(const layer of m.getStyle().layers??[]){if(layer.type==='fill-extrusion'||/poi|housenumber/i.test(layer.id))m.setLayoutProperty(layer.id,'visibility','none');if(layer.type==='line'&&/road.*minor|street.*minor/i.test(layer.id))m.setPaintProperty(layer.id,'line-color','#7c8794');}setReady(n=>n+1);});m.on('error',()=>setError('Mapa base indisponível. Verifique a conexão com MapTiler.'));
+  m.on('style.load',()=>{styleReady.current=true;for(const layer of m.getStyle().layers??[]){if(layer.type==='fill-extrusion'||/poi|housenumber/i.test(layer.id))m.setLayoutProperty(layer.id,'visibility','none');if(layer.type==='line'&&/road.*minor|street.*minor/i.test(layer.id))m.setPaintProperty(layer.id,'line-color','#7c8794');}setReady(n=>n+1);});m.on('error',()=>setError('Mapa base indisponível. Verifique a conexão com MapTiler.'));
   m.on('zoom',()=>{for(const entry of markers.current.values())entry.marker.getElement().style.visibility=m.getZoom()<11?'hidden':'visible';});
   m.on('click',e=>{if(!callbacks.current.pickMode)return;const point:LatLon=[e.lngLat.lat,e.lngLat.lng];callbacks.current.onPick?.(point);});
   const resize=new ResizeObserver(()=>m.resize());resize.observe(root.current);
   return()=>{resize.disconnect();markers.current.forEach(x=>cancelAnimationFrame(x.frame));markers.current.clear();picker.current=null;m.remove();map.current=null;};
  },[]);
- useEffect(()=>{const m=map.current;if(!m||!key)return;m.setStyle(dark?(import.meta.env.VITE_MAP_DARK_STYLE_URL||`https://api.maptiler.com/maps/dataviz-dark/style.json?key=${encodeURIComponent(key)}`):(import.meta.env.VITE_MAP_STYLE_URL||`https://api.maptiler.com/maps/dataviz/style.json?key=${encodeURIComponent(key)}`));},[dark]);
+ useEffect(()=>{const m=map.current;if(!m||!key)return;styleReady.current=false;m.setStyle(dark?(import.meta.env.VITE_MAP_DARK_STYLE_URL||`https://api.maptiler.com/maps/dataviz-dark/style.json?key=${encodeURIComponent(key)}`):(import.meta.env.VITE_MAP_STYLE_URL||`https://api.maptiler.com/maps/dataviz/style.json?key=${encodeURIComponent(key)}`));},[dark]);
  useEffect(()=>{if(focus)map.current?.flyTo({center:lnglat(focus),zoom,duration:500});},[focus?.[0],focus?.[1],zoom]);
  useEffect(()=>{
   const m=map.current;if(!m||!pickMode||!focus)return;
@@ -49,7 +49,7 @@ export function OperationsMap({vehicles,incidents,dispatches,selectedId,onSelect
  useEffect(()=>{
   const m=map.current;if(!m||!ready)return;
   const features=dispatches.filter(d=>!['CONCLUIDO','CANCELADO'].includes(d.status)).flatMap(d=>{const points=geometry(d.rota);if(!points||(!showAllRoutes&&![d.id,d.viaturaId,d.ocorrenciaId].includes(selectedId??'')))return [];const selected=[d.id,d.viaturaId,d.ocorrenciaId].includes(selectedId??'');return [{type:'Feature' as const,properties:{selected},geometry:{type:'LineString' as const,coordinates:points.map(lnglat)}}];});
-  if(!m.isStyleLoaded())return;
+  if(!styleReady.current)return;
   if(!m.getSource('routes')){m.addSource('routes',{type:'geojson',data:{type:'FeatureCollection',features:[]}});m.addLayer({id:'route-lines',type:'line',source:'routes',paint:{'line-color':'#235fa4','line-width':['case',['get','selected'],5,3],'line-opacity':['case',['get','selected'],.95,.35]}});}
   (m.getSource('routes') as GeoJSONSource).setData({type:'FeatureCollection',features});
   if(!m.getSource('fleet-clusters')){
