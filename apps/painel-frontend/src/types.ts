@@ -1,0 +1,10 @@
+export type View = 'overview'|'map'|'incidents'|'fleet'|'history'|'simulation';
+export type EntitySelection = {kind:'incident'|'vehicle'|'dispatch';id:string}|null;
+export type LatLon=[number,number];
+export type Admin={id:string;nome:string;email:string;centralId:string;papel:string};
+export type Central={id:string;nome:string;codigo:string;ativo:boolean};
+export type Vehicle={id:string;placa:string;status:string;latitude:number;longitude:number;capacidade:number;versao:number;atualizadoEm:string};
+export type Incident={id:string;centralId:string;tipo:string;prioridade:number;latitude:number;longitude:number;status:string;viaturaId?:string|null;criadoEm:string;atualizadoEm:string};
+export type Dispatch={id:string;ocorrenciaId:string;viaturaId:string;status:string;distanciaMetros?:number|null;duracaoSegundos?:number|null;progresso:number;rota?:string|null;simulacaoPausada:boolean;criadoEm:string;concluidoEm?:string|null;viatura?:Vehicle};
+export type Simulation={fator:number;pausada:boolean;sinalIndisponivel:boolean};
+export type Snapshot={me:Admin;listarCentrais:Central[];listarViaturas:Vehicle[];listarOcorrencias:Incident[];listarDespachos:Dispatch[];estadoSimulacao:Simulation};

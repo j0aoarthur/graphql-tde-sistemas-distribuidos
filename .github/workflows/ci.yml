@@ -1,0 +1,71 @@
+name: CI · SDV
+on:
+  pull_request:
+  push:
+    branches: [main]
+permissions:
+  contents: read
+jobs:
+  quality:
+    name: Backend, frontend e contratos
+    runs-on: ubuntu-latest
+    env:
+      OCC_DATABASE_URL: postgresql://sdv:sdv@127.0.0.1:5432/ocorrencias_db
+      VIATURAS_DATABASE_URL: postgresql://sdv:sdv@127.0.0.1:5432/viaturas_db
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-node@v4
+        with: {node-version: '22'}
+      - run: npm install --no-audit --no-fund
+      - run: npm run db:generate
+      - run: npm test
+      - run: npm run build
+  integration:
+    name: Contrato GraphQL e concorrência com Redis/PostgreSQL reais
+    runs-on: ubuntu-latest
+    env:
+      NODE_ENV: test
+      JWT_SECRET: ci-only-secret-never-use-in-production-32-chars
+      INTERNAL_SERVICE_TOKEN: ci-only-internal-secret-not-for-production
+      DEMO_ADMIN_PASSWORD: Ci_Only_Long_Password123
+      OCC_DATABASE_URL: postgresql://sdv:sdv_dev_only@127.0.0.1:5432/ocorrencias_db
+      VIATURAS_DATABASE_URL: postgresql://sdv:sdv_dev_only@127.0.0.1:5432/viaturas_db
+      REDIS_URL: redis://127.0.0.1:6379
+      VIATURAS_INTERNAL_URL: http://127.0.0.1:4002/internal/dispatch
+      OCCORRENCIAS_URL: http://127.0.0.1:4001/graphql
+      VIATURAS_URL: http://127.0.0.1:4002/graphql
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-node@v4
+        with: {node-version: '22'}
+      - run: npm install --no-audit --no-fund
+      - run: docker compose up -d --wait
+      - run: node scripts/bootstrap-databases.mjs
+      - run: npm run db:generate && npm run db:migrate && npm run seed && npm run build
+      - name: Iniciar microsserviços e workers
+        shell: bash
+        run: |
+          node apps/ocorrencias-service/dist/main.js > /tmp/ocorrencias.log 2>&1 &
+          node apps/viaturas-service/dist/main.js > /tmp/viaturas.log 2>&1 &
+          node apps/dispatch-worker/dist/main.js > /tmp/worker.log 2>&1 &
+          node apps/gateway/dist/main.js > /tmp/gateway.log 2>&1 &
+          for i in $(seq 1 40); do
+            if curl -fsS http://127.0.0.1:4000/health >/dev/null; then exit 0; fi
+            sleep 2
+          done
+          cat /tmp/{ocorrencias,viaturas,worker,gateway}.log
+          exit 1
+      - run: npm run test:concurrency
+      - if: failure()
+        run: |
+          cat /tmp/ocorrencias.log /tmp/viaturas.log /tmp/gateway.log /tmp/worker.log || true
+  infrastructure:
+    name: Terraform · sintaxe e esquema
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+      - uses: hashicorp/setup-terraform@v3
+        with: {terraform_version: '1.10.5'}
+      - run: terraform fmt -recursive infra/terraform
+      - run: terraform -chdir=infra/terraform init -backend=false
+      - run: terraform -chdir=infra/terraform validate

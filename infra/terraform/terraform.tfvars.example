@@ -1,0 +1,7 @@
+aws_region       = "us-east-1"
+availability_zone= "us-east-1a"
+project          = "sdv"
+deploy_services  = false
+image_tag        = "SET_TO_EXISTING_ECR_IMAGE_SHA"
+monthly_budget_usd = 60
+alert_email      = ""
