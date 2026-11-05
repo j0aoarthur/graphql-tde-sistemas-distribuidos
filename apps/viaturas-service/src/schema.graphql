@@ -36,6 +36,7 @@ type Despacho {
   saidaEm: String
   etaOriginalSegundos: Float
   etaAtualSegundos: Float
+  previsaoChegadaInicialEm: String
   previsaoChegadaEm: String
   previsaoAtualizadaEm: String
   fatorSimulacaoAplicado: Float

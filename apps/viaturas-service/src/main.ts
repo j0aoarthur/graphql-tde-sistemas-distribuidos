@@ -29,7 +29,7 @@ class DispatchService implements OnModuleDestroy {
   async onModuleDestroy(){this.redis.disconnect();}
   async getSimulation(){
     const [factor,paused,signal]=await Promise.all([this.redis.get('sdv:sim:factor'),this.redis.get('sdv:sim:paused'),this.redis.get('sdv:sim:signal-lost')]);
-    return {fator:factor?Number(factor):12,pausada:paused==='1',sinalIndisponivel:signal==='1'};
+    return {fator:factor?Number(factor):1,pausada:paused==='1',sinalIndisponivel:signal==='1'};
   }
   async setSimulation(fator:number,pausada:boolean){
     await this.db.despacho.updateMany({where:{status:{in:['CONFIRMADO','EM_DESLOCAMENTO']}},data:{previsaoChegadaEm:null,versao:{increment:1}}});
@@ -148,6 +148,7 @@ class ViaturaResolver {
 }
 @Resolver('Despacho')
 class DespachoResolver {
+ @ResolveField('previsaoChegadaInicialEm') previsaoChegadaInicialEm(@Parent() d:any){return d.previsaoChegadaInicialEm?.toISOString()??null;}
  @ResolveField('previsaoChegadaEm') previsaoChegadaEm(@Parent() d:any){return d.previsaoChegadaEm?.toISOString()??null;}
  @ResolveField('previsaoAtualizadaEm') previsaoAtualizadaEm(@Parent() d:any){return d.previsaoAtualizadaEm?.toISOString()??null;}
  @ResolveField('criadoEm') criadoEm(@Parent() d:any){return d.criadoEm?.toISOString()??null;}

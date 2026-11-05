@@ -28,3 +28,6 @@ assert.ok(received.every(x=>x.status==='DESPACHADA'||x.status==='AGUARDANDO_VIAT
 const assigned=received.map(x=>x.viaturaId).filter(Boolean);
 assert.equal(new Set(assigned).size,assigned.length,'nenhuma viatura alocada duas vezes');
 console.log('PASSOU: duas centrais, concorrência GraphQL, nenhuma viatura duplicada',received);
+
+for(const [result,token] of [[one,a],[two,b]])await query('mutation($id:ID!){cancelarOcorrencia(id:$id,motivo:"Limpeza do teste concorrente"){id}}',{id:result.abrirOcorrencia.id},token);
+for(const id of ids){let status='';for(let n=0;n<40;n++){status=(await query('query($id:ID!){consultarOcorrencia(id:$id){status}}',{id},a)).consultarOcorrencia.status;if(status==='CANCELADA')break;await new Promise(r=>setTimeout(r,250));}assert.equal(status,'CANCELADA','limpeza libera recursos antes do próximo cenário');}
