@@ -4,6 +4,8 @@ import { Pool } from 'pg';
 import { randomUUID } from 'node:crypto';
 const STREAM=process.env.NODE_ENV==='test'&&process.env.SDV_TEST_STREAM?process.env.SDV_TEST_STREAM:'sdv:ocorrencias', GROUP='sdv:dispatch', CONSUMER=`worker-${randomUUID()}`;
 const redis=new Redis(process.env.REDIS_URL??'redis://localhost:6379',{maxRetriesPerRequest:null});
+// Blocking reads must not delay Outbox publication, ACKs or reconciliation.
+const reader=redis.duplicate();
 const pool=new Pool({connectionString:process.env.OCC_DATABASE_URL,max:5});
 const fleetPool=new Pool({connectionString:process.env.VIATURAS_DATABASE_URL,max:3});
 let running=true;
@@ -113,7 +115,7 @@ async function consume(){
         for(const [id,fields] of claimed?.[1]??[]) {try{await processMessage(id,fields);}catch(e){console.error('Retomada',id,e);}}
       }
       if(Date.now()-retry>15000&&!(process.env.NODE_ENV==='test'&&process.env.SDV_TEST_STREAM)){retry=Date.now();await retryWaiting();}
-      const response=await redis.xreadgroup('GROUP',GROUP,CONSUMER,'COUNT',10,'BLOCK',2000,'STREAMS',STREAM,'>') as any;
+      const response=await reader.xreadgroup('GROUP',GROUP,CONSUMER,'COUNT',10,'BLOCK',2000,'STREAMS',STREAM,'>') as any;
       for(const [,messages] of response??[])for(const [id,fields] of messages){try{await processMessage(id,fields);}catch(e){console.error('Processamento',id,e);}}
     }catch(e){console.error('Consumer offline:',e);await sleep(1500);}
   }
@@ -121,6 +123,6 @@ async function consume(){
 async function main(){
   process.once('SIGTERM',()=>running=false);process.once('SIGINT',()=>running=false);
   const publisher=(async()=>{while(running){try{await publishOutbox();if(!(process.env.NODE_ENV==='test'&&process.env.SDV_TEST_CRASH))await replayFleetOutbox();}catch(e){console.error('Outbox',e);}await sleep(1400);}})();
-  await consume();await publisher;await Promise.all([redis.quit(),pool.end(),fleetPool.end()]);
+  await consume();await publisher;await Promise.all([redis.quit(),reader.quit(),pool.end(),fleetPool.end()]);
 }
 main().catch(e=>{console.error(e);process.exitCode=1;});
