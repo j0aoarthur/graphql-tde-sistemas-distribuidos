@@ -1,0 +1,6 @@
+Execução local observada em 2026-11-05, antes da indisponibilidade do executor.
+Comando: NODE_USE_ENV_PROXY=1 OSRM_REAL_URL=https://router.project-osrm.org node tests/routing-smoke.mjs
+Script versionado em 24e698acbbb9592e249639ca947a1db8eb7e5a42; não é uma execução do CI.
+Saída observada:
+PASSOU: OSRM real retornou geometria, distância e duração para dois pontos de Feira de Santana {"pontos":44,"metros":1943.1,"segundos":199}
+Escopo: um par de pontos, sem homologar a cidade inteira ou o provedor MapTiler.
