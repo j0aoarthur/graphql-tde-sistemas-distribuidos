@@ -22,6 +22,7 @@ model Admin {
   senhaHash   String
   ativo       Boolean @default(true)
   papel       String @default("ADMIN")
+  sessoes     Sessao[]
   central     Central @relation(fields:[centralId],references:[id])
 }
 model Ocorrencia {
@@ -49,4 +50,16 @@ model Outbox {
   lockedUntil  DateTime?
   tentativas   Int @default(0)
   @@index([publicadoEm,lockedUntil])
+}
+
+model Sessao {
+  id String @id @default(uuid()) @db.Uuid
+  adminId String @db.Uuid
+  tokenHash String @unique
+  anteriorHash String?
+  rotacionadoEm DateTime @default(now())
+  expiraEm DateTime
+  revogadoEm DateTime?
+  admin Admin @relation(fields: [adminId], references: [id], onDelete: Cascade)
+  @@index([adminId])
 }

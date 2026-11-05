@@ -10,3 +10,6 @@ dist/
 coverage/
 apps/**/src/generated/
 .DS_Store
+
+test-results/
+playwright-report/

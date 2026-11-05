@@ -1,0 +1,21 @@
+
+> sdv-monorepo@0.1.0 test:concurrency
+> NODE_ENV=test node tests/concurrency.mjs
+
+PASSOU: duas centrais, concorrência GraphQL, nenhuma viatura duplicada [
+  {
+    id: 'ef59c469-faa8-436e-b361-b0410b2ddfa9',
+    status: 'DESPACHADA',
+    viaturaId: '8976a3aa-0964-4691-b9d8-50587cb52875'
+  },
+  {
+    id: '0a8241c8-6b21-4cfd-9ce1-0ce20fc32d9c',
+    status: 'DESPACHADA',
+    viaturaId: 'bc3733d7-f9ed-496b-96af-75ba1a0aeabe'
+  }
+]
+npm notice
+npm notice New major version of npm available! 11.9.0 -> 12.2.2
+npm notice Changelog: https://github.com/npm/cli/releases/tag/v12.2.2
+npm notice To update run: npm install -g npm@12.2.2
+npm notice

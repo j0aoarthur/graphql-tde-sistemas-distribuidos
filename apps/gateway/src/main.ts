@@ -41,6 +41,18 @@ const schema=makeExecutableSchema({
 });
 async function bootstrap(){
   const app=await NestFactory.create(AppModule);
+  const express=app.getHttpAdapter().getInstance();
+  express.use(require('express').json({limit:'16kb'}));
+  express.use('/auth',async(req:any,res:any)=>{
+    try{
+      const url=new URL(`/auth${req.url}`,process.env.OCCORRENCIAS_URL??'http://localhost:4001/graphql');
+      if(req.method!=='POST'||!['/auth/login','/auth/refresh','/auth/logout'].includes(url.pathname))return res.sendStatus(404);
+      const response=await fetch(url,{method:'POST',headers:{'content-type':'application/json','cookie':req.headers.cookie??'','origin':req.headers.origin??'','x-sdv-csrf':req.headers['x-sdv-csrf']??''},body:JSON.stringify(req.body??{}),signal:AbortSignal.timeout(10000)});
+      res.setHeader('Cache-Control','no-store');
+      const cookie=response.headers.get('set-cookie');if(cookie)res.setHeader('Set-Cookie',cookie);
+      res.status(response.status).type('json').send(await response.text());
+    }catch{res.status(502).json({error:'Serviço de sessão indisponível'});}
+  });
   app.enableCors({origin:(process.env.FRONTEND_ORIGIN??'http://localhost:5173').split(',')});
   const wss=new WebSocketServer({server:app.getHttpServer(),path:'/subscriptions'});
   const serverCleanup=useServer({schema,onConnect:(ctx)=>{

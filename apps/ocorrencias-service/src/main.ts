@@ -1,4 +1,5 @@
 import 'reflect-metadata';
+import { sessionRoutes } from './session';
 import { Module, Injectable, OnModuleInit, OnModuleDestroy, UnauthorizedException, BadRequestException, ConflictException } from '@nestjs/common';
 import { NestFactory } from '@nestjs/core';
 import { GraphQLModule, Resolver, Query, Mutation, Args, Context, ResolveField, Parent, ResolveReference } from '@nestjs/graphql';
@@ -100,7 +101,7 @@ class OcorrenciaResolver {
   @ResolveField('viatura') viatura(@Parent() ocorrencia: {viaturaId:string|null}) {return ocorrencia.viaturaId?{__typename:'Viatura',id:ocorrencia.viaturaId}:null;}
   @ResolveReference() async reference(ref:{id:string}){return this.db.ocorrencia.findUnique({where:{id:ref.id}});}
 }
-@Module({imports:[GraphQLModule.forRoot<ApolloFederationDriverConfig>({driver:ApolloFederationDriver,typePaths:[join(__dirname,'schema.graphql')],context:({req})=>({req}),introspection:process.env.NODE_ENV!=='production'})],providers:[Database,OcorrenciaResolver]})
+@Module({imports:[GraphQLModule.forRoot<ApolloFederationDriverConfig>({driver:ApolloFederationDriver,typePaths:[join(__dirname,'schema.graphql')],context:({req}:any)=>({req}),introspection:process.env.NODE_ENV!=='production'})],providers:[Database,OcorrenciaResolver]})
 class AppModule {}
-async function bootstrap(){const app=await NestFactory.create(AppModule);app.enableShutdownHooks();app.use('/health',(_req:any,res:any)=>res.json({status:'ok'}));await app.listen(Number(process.env.PORT||4001),'0.0.0.0');}
+async function bootstrap(){const app=await NestFactory.create(AppModule);app.enableShutdownHooks();app.use(require('express').json({limit:'16kb'}));sessionRoutes(app.getHttpAdapter().getInstance(),app.get(Database));app.use('/health',(_req:any,res:any)=>res.json({status:'ok'}));await app.listen(Number(process.env.PORT||4001),'0.0.0.0');}
 bootstrap().catch(err=>{console.error(err);process.exitCode=1;});

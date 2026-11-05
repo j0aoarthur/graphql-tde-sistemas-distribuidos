@@ -136,7 +136,7 @@ class InternalController {
   @Post('dispatch') async dispatchCommand(@Headers('x-internal-token') token:string,@Body() input:any){this.auth(token);return this.dispatch.alocar(input);}
   @Post('finish') async finishCommand(@Headers('x-internal-token') token:string,@Body() input:any){this.auth(token);return this.dispatch.finalizar(input);}
 }
-@Module({imports:[GraphQLModule.forRoot<ApolloFederationDriverConfig>({driver:ApolloFederationDriver,typePaths:[join(__dirname,'schema.graphql')],context:({req})=>({req}),introspection:process.env.NODE_ENV!=='production'})],providers:[Database,DispatchService,ViaturaResolver,DespachoResolver],controllers:[InternalController]})
+@Module({imports:[GraphQLModule.forRoot<ApolloFederationDriverConfig>({driver:ApolloFederationDriver,typePaths:[join(__dirname,'schema.graphql')],context:({req}:any)=>({req}),introspection:process.env.NODE_ENV!=='production'})],providers:[Database,DispatchService,ViaturaResolver,DespachoResolver],controllers:[InternalController]})
 class AppModule{}
 async function bootstrap(){const app=await NestFactory.create(AppModule);app.enableShutdownHooks();app.use('/health',(_req:any,res:any)=>res.json({status:'ok'}));await app.listen(Number(process.env.PORT||4002),'0.0.0.0');}
 bootstrap().catch(err=>{console.error(err);process.exitCode=1;});

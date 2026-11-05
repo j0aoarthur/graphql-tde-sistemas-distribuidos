@@ -1,0 +1,22 @@
+
+> sdv-monorepo@0.1.0 test
+> node --test tests/*.test.cjs
+
+✔ distância zero para mesmo ponto (0.909048ms)
+✔ ordena apenas viaturas livres e com desempate estável (16.122647ms)
+✔ valida latitude e longitude (1.741933ms)
+✔ início e fim da rota (1.253124ms)
+✔ interpolação acompanha geometria real (quebra de direção) (0.295715ms)
+ℹ tests 5
+ℹ suites 0
+ℹ pass 5
+ℹ fail 0
+ℹ cancelled 0
+ℹ skipped 0
+ℹ todo 0
+ℹ duration_ms 208.173188
+npm notice
+npm notice New major version of npm available! 11.9.0 -> 12.2.2
+npm notice Changelog: https://github.com/npm/cli/releases/tag/v12.2.2
+npm notice To update run: npm install -g npm@12.2.2
+npm notice

@@ -56,6 +56,18 @@ jobs:
           cat /tmp/{ocorrencias,viaturas,worker,gateway}.log
           exit 1
       - run: npm run test:concurrency
+      - run: npm run test:session
+      - name: E2E de sessão no navegador
+        run: |
+          npx playwright install --with-deps chromium
+          npm run dev:frontend > /tmp/frontend.log 2>&1 &
+          npx playwright test tests/session.spec.ts --workers=1 --reporter=line
+      - uses: actions/upload-artifact@v4
+        if: always()
+        with:
+          name: evidencias-sessao
+          path: test-results/
+
       - if: failure()
         run: |
           cat /tmp/ocorrencias.log /tmp/viaturas.log /tmp/gateway.log /tmp/worker.log || true
