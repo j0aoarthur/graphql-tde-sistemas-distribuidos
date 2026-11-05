@@ -4,7 +4,7 @@
   "version": "0.1.0",
   "scripts": {
     "dev": "tsx watch src/main.ts",
-    "build": "tsc -p tsconfig.json && cp src/schema.graphql dist/schema.graphql && mkdir -p dist/generated && cp -R src/generated/client dist/generated/client",
+    "build": "tsc -p tsconfig.json && cp src/schema.graphql dist/schema.graphql && mkdir -p dist/generated/client && cp -R src/generated/client/. dist/generated/client/",
     "db:generate": "prisma generate --schema prisma/schema.prisma",
     "db:push": "prisma db push --schema prisma/schema.prisma",
     "db:migrate": "prisma migrate deploy --schema prisma/schema.prisma"

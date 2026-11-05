@@ -22,16 +22,16 @@ export function sessionRoutes(app:any,db:any){
   };
   const attempts=new Map<string,{count:number;until:number}>();
   app.post('/auth/login',async(req:any,res:any,next:any)=>{try{
-    const key=req.ip;const now=Date.now();
+    const key=hash(`${req.ip}:${String(req.body?.email??'').trim().toLowerCase().slice(0,255)}`);const now=Date.now();
     if(attempts.size>10000)for(const [k,v] of attempts)if(v.until<now)attempts.delete(k);
-    const limit=attempts.get(key);if(limit&&limit.until>now&&limit.count>=10)return res.status(429).json({error:'Tente novamente em alguns minutos'});
+    const limit=attempts.get(key);if(limit&&limit.until>now&&limit.count>=20)return res.status(429).json({error:'Tente novamente em alguns minutos'});
     attempts.set(key,{count:limit&&limit.until>now?limit.count+1:1,until:limit&&limit.until>now?limit.until:now+60000});
     const {email,senha}=req.body??{};
     if(typeof email!=='string'||typeof senha!=='string'||email.length>255||senha.length>256)return res.status(400).json({error:'Credenciais inválidas'});
     const user=await db.admin.findUnique({where:{email:email.trim().toLowerCase()},include:{central:true}});
     if(!user?.ativo||!user.central.ativo||!await bcrypt.compare(senha,user.senhaHash))return res.status(401).json({error:'Credenciais inválidas'});
     const result=issue(user),raw=randomBytes(32).toString('hex');
-    await db.sessao.create({data:{adminId:user.id,tokenHash:hash(raw),expiraEm:new Date(now+7*86400000)}});
+    await db.sessao.create({data:{adminId:user.id,tokenHash:hash(raw),expiraEm:new Date(now+7*86400000),eventos:{create:{tipo:'LOGIN'}}}});
     res.setHeader('Set-Cookie',cookie(raw,7*86400));res.json(result);
   }catch(e){next(e);}});
   app.post('/auth/refresh',async(req:any,res:any,next:any)=>{try{
@@ -44,17 +44,22 @@ export function sessionRoutes(app:any,db:any){
         const replacement=createHmac('sha256',process.env.JWT_SECRET!).update(raw).digest('hex');
         if(hash(replacement)===previous.tokenHash){res.setHeader('Set-Cookie',cookie(replacement,Math.floor((previous.expiraEm.getTime()-Date.now())/1000)));return res.json(issue(previous.admin));}
       }
-      if(previous)await db.sessao.updateMany({where:{id:previous.id},data:{revogadoEm:new Date()}});
+      const used=await db.sessaoToken.findUnique({where:{tokenHash:hash(raw)}});
+      const sessionId=previous?.id??used?.sessaoId;
+      if(sessionId)await db.sessao.update({where:{id:sessionId},data:{revogadoEm:new Date(),eventos:{create:{tipo:'REUSO_TOKEN_REVOGADO'}}}});
       return res.status(401).json({error:'Sessão inválida'});
     }
     if(current.revogadoEm||current.expiraEm.getTime()<=Date.now()||!current.admin.ativo||!current.admin.central.ativo)return res.status(401).json({error:'Sessão expirada'});
     const result=issue(current.admin),replacement=createHmac('sha256',process.env.JWT_SECRET!).update(raw).digest('hex');
-    const changed=await db.sessao.updateMany({where:{id:current.id,tokenHash:hash(raw),revogadoEm:null},data:{tokenHash:hash(replacement),anteriorHash:hash(raw),rotacionadoEm:new Date()}});
+    const changed=await db.$transaction(async(tx:any)=>{
+      const result=await tx.sessao.updateMany({where:{id:current.id,tokenHash:hash(raw),revogadoEm:null},data:{tokenHash:hash(replacement),anteriorHash:hash(raw),rotacionadoEm:new Date()}});
+      if(result.count){await tx.sessaoToken.create({data:{tokenHash:hash(raw),sessaoId:current.id}});await tx.eventoSessao.create({data:{sessaoId:current.id,tipo:'REFRESH'}});}return result;
+    });
     if(!changed.count)return res.status(409).json({error:'Rotação concorrente'});
     res.setHeader('Set-Cookie',cookie(replacement,Math.max(0,Math.floor((current.expiraEm.getTime()-Date.now())/1000))));res.json(result);
   }catch(e){next(e);}});
   app.post('/auth/logout',async(req:any,res:any,next:any)=>{try{
-    const digest=hash(tokenFrom(req));await db.sessao.updateMany({where:{OR:[{tokenHash:digest},{anteriorHash:digest}]},data:{revogadoEm:new Date()}});
+    const digest=hash(tokenFrom(req));await db.sessao.updateMany({where:{OR:[{tokenHash:digest},{anteriorHash:digest},{tokens:{some:{tokenHash:digest}}}]},data:{revogadoEm:new Date()}});
     res.setHeader('Set-Cookie',cookie('',0));res.json({ok:true});
   }catch(e){next(e);}});
 }

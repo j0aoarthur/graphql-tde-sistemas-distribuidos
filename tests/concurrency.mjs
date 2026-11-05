@@ -11,7 +11,7 @@ async function query(gql,vars={},token='') {
 }
 async function login(email){const {login}=await query('mutation($email:String!,$senha:String!){login(email:$email,senha:$senha){accessToken}}',{email,senha:password});return login.accessToken;}
 const [a,b]=await Promise.all([login('central-a@sdv.local'),login('central-b@sdv.local')]);
-const sameLocation={tipo:'Teste automático concorrente',prioridade:3,latitude:-12.26,longitude:-38.97};
+const sameLocation={descricao:'Teste automatizado concorrente',enderecoFormatado:'Feira de Santana BA',origemLocalizacao:'PIN',precisaoLocalizacao:'PONTO',localConfirmado:true,tipo:'Teste automático concorrente',prioridade:3,latitude:-12.26,longitude:-38.97};
 const gql='mutation($input:AbrirOcorrenciaInput!){abrirOcorrencia(input:$input){id status}}';
 const [one,two]=await Promise.all([query(gql,{input:{...sameLocation,clientRequestId:randomUUID()}},a),query(gql,{input:{...sameLocation,clientRequestId:randomUUID()}},b)]);
 assert.notEqual(one.abrirOcorrencia.id,two.abrirOcorrencia.id);

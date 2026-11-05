@@ -1,0 +1,14 @@
+import {useEffect,useState} from 'react';
+import {gql} from '../api';
+import {accessToken} from '../session';
+const HISTORY='query($id:ID!,$cursor:ID){despachosViatura(id:$id,cursor:$cursor,limit:20){id status despachadoEm chegadaEm concluidoEm}}';
+export function FleetStatistics({id}:{id:string}){
+ const[data,setData]=useState<any>(null),[error,setError]=useState(false),[history,setHistory]=useState<any[]>([]),[more,setMore]=useState(true),[busy,setBusy]=useState(false);
+ const stamp=(s?:string|null)=>s?new Date(s).toLocaleString('pt-BR',{timeZone:'America/Bahia'}):'Não registrado';
+ useEffect(()=>{let active=true;setData(null);setHistory([]);setError(false);setMore(true);void Promise.all([gql<any>('query($id:ID!){estatisticasViatura(id:$id){despachosIniciadosHoje atendimentosConcluidosHoje canceladosHoje operandoDesde ultimoSinalEm situacaoSinal tempoTotalEmDeslocamentoHoje}}',{id},accessToken()),gql<any>(HISTORY,{id},accessToken())]).then(([d,h])=>{if(active){setData(d.estatisticasViatura);setHistory(h.despachosViatura);setMore(h.despachosViatura.length===20);}}).catch(()=>{if(active)setError(true);});return()=>{active=false;};},[id]);
+ async function next(){setBusy(true);try{const d=await gql<any>(HISTORY,{id,cursor:history.at(-1)?.id},accessToken());setHistory(previous=>[...previous,...d.despachosViatura.filter((x:any)=>!previous.some(p=>p.id===x.id))]);setMore(d.despachosViatura.length===20);}catch{setError(true);}finally{setBusy(false);}}
+ if(error)return <p>Estatísticas e histórico do turno indisponíveis</p>;
+ if(!data)return <p>Carregando estatísticas do turno…</p>;
+ const seconds=data.operandoDesde?Math.floor((Date.now()-new Date(data.operandoDesde).getTime())/1000):null;
+ return <section className="detail-section"><h3>Turno e dia em America/Bahia</h3><div className="detail-facts"><div><span>Operando desde</span><b>{data.operandoDesde?stamp(data.operandoDesde):'Turno não iniciado'}</b></div><div><span>Turno decorrido</span><b>{seconds===null?'Turno não iniciado':Math.floor(seconds/3600)+' h '+Math.floor(seconds%3600/60)+' min '+seconds%60+' s'}</b></div><div><span>Despachos iniciados hoje</span><b>{data.despachosIniciadosHoje}</b></div><div><span>Concluídos hoje</span><b>{data.atendimentosConcluidosHoje}</b></div><div><span>Cancelados hoje</span><b>{data.canceladosHoje}</b></div><div><span>Deslocamento observado hoje</span><b>{Math.round(data.tempoTotalEmDeslocamentoHoje)} s na simulação</b></div><div><span>Sinal</span><b>{data.situacaoSinal}</b></div></div><details><summary>Histórico de despachos da viatura</summary>{history.length?history.map(d=><p key={d.id}>{d.status} · {stamp(d.despachadoEm)} · Chegada: {stamp(d.chegadaEm)}</p>):<p>Nenhum despacho registrado</p>}{more&&<button className="btn btn-outline" disabled={busy} onClick={()=>void next()}>{busy?'Carregando…':'Carregar mais despachos'}</button>}</details></section>;
+}

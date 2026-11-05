@@ -1,7 +1,10 @@
 let token='';
 let refreshing:Promise<string>|null=null;
 let generation=0;
+const channel=typeof BroadcastChannel!=='undefined'?new BroadcastChannel('sdv-session-events'):null;
+channel?.addEventListener('message',event=>{if(event.data==='logout'){generation++;token='';window.dispatchEvent(new Event('sdv-session-expired'));}});
 export const accessToken=()=>token;
+export async function sessionToken(){try{const claim=JSON.parse(atob(token.split('.')[1].replace(/-/g,'+').replace(/_/g,'/')));if(claim.exp*1000>Date.now()+5000)return token;}catch{}return refreshSession();}
 export async function sessionRequest(path:string,body:unknown={}){
  const response=await fetch(`/auth/${path}`,{method:'POST',credentials:'include',headers:{'content-type':'application/json','x-sdv-csrf':'1'},body:JSON.stringify(body),cache:'no-store'});
  if(!response.ok)throw Object.assign(Error(response.status===401?'Sessão expirada. Entre novamente.':'Não foi possível atualizar a sessão.'),{status:response.status});
@@ -16,4 +19,4 @@ export function refreshSession():Promise<string>{
  return refreshing;
 }
 export async function loginSession(email:string,senha:string){generation++;const data=await sessionRequest('login',{email,senha});token=data.accessToken;return token;}
-export async function logoutSession(){generation++;await refreshing?.catch(()=>{});await sessionRequest('logout');token='';}
+export async function logoutSession(){generation++;await refreshing?.catch(()=>{});await sessionRequest('logout');token='';channel?.postMessage('logout');}

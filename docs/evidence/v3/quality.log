@@ -1,0 +1,53 @@
+Trechos do job quality. Conclusão verificada: success.
+SHA: 16b5e4710a3d39d47e1dd8a06584f29238f2ffca
+Rodada: https://github.com/j0aoarthur/graphql-tde-sistemas-distribuidos/actions/runs/41976051692
+
+##[group]Run npm run db:generate
+> sdv-monorepo@0.1.0 db:generate
+> npm run db:generate -w @sdv/ocorrencias && npm run db:generate -w @sdv/viaturas
+> @sdv/ocorrencias@0.1.0 db:generate
+> prisma generate --schema prisma/schema.prisma
+✔ Generated Prisma Client (v6.19.0) to ./src/generated/client in 132ms
+> @sdv/viaturas@0.1.0 db:generate
+> prisma generate --schema prisma/schema.prisma
+✔ Generated Prisma Client (v6.19.0) to ./src/generated/client in 84ms
+##[group]Run npm run lint
+> sdv-monorepo@0.1.0 lint
+> eslint .
+> sdv-monorepo@0.1.0 test
+> node --test tests/*.test.cjs
+TAP version 13
+# Subtest: distância zero para mesmo ponto
+ok 1 - distância zero para mesmo ponto
+# Subtest: ordena apenas viaturas livres e com desempate estável
+ok 2 - ordena apenas viaturas livres e com desempate estável
+# Subtest: valida latitude e longitude
+ok 3 - valida latitude e longitude
+# Subtest: início e fim da rota
+ok 4 - início e fim da rota
+# Subtest: interpolação acompanha geometria real (quebra de direção)
+ok 5 - interpolação acompanha geometria real (quebra de direção)
+# Subtest: reconexão e eventos atrasados não regridem versões ou heartbeat
+ok 6 - reconexão e eventos atrasados não regridem versões ou heartbeat
+# tests 6
+# suites 0
+# pass 6
+# fail 0
+# cancelled 0
+# skipped 0
+##[group]Run npm run build
+> sdv-monorepo@0.1.0 build
+> npm run build -w @sdv/gateway && npm run build -w @sdv/ocorrencias && npm run build -w @sdv/viaturas && npm run build -w @sdv/worker && npm run build -w @sdv/frontend && npm run build -w @sdv/simulator
+> @sdv/gateway@0.1.0 build
+> tsc -p tsconfig.json
+> @sdv/ocorrencias@0.1.0 build
+> tsc -p tsconfig.json && cp src/schema.graphql dist/schema.graphql && mkdir -p dist/generated/client && cp -R src/generated/client/. dist/generated/client/
+> @sdv/viaturas@0.1.0 build
+> tsc -p tsconfig.json && cp src/schema.graphql dist/schema.graphql && mkdir -p dist/generated/client && cp -R src/generated/client/. dist/generated/client/
+> @sdv/worker@0.1.0 build
+> tsc -p tsconfig.json
+> @sdv/frontend@0.1.0 build
+> tsc --noEmit && vite build
+✓ built in 4.63s
+> @sdv/simulator@0.2.0 build
+> tsc -p tsconfig.json

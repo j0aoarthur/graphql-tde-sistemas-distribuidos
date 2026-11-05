@@ -1,0 +1,11 @@
+Trechos do job terraform. Conclusão verificada: success.
+SHA: 16b5e4710a3d39d47e1dd8a06584f29238f2ffca
+Rodada: https://github.com/j0aoarthur/graphql-tde-sistemas-distribuidos/actions/runs/41976051692
+
+##[group]Run terraform -chdir=infra/terraform fmt -check -recursive
+terraform -chdir=infra/terraform fmt -check -recursive
+##[group]Run terraform -chdir=infra/terraform init -backend=false
+terraform -chdir=infra/terraform init -backend=false
+##[group]Run terraform -chdir=infra/terraform validate
+terraform -chdir=infra/terraform validate
+Success! The configuration is valid.

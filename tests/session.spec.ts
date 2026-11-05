@@ -1,4 +1,5 @@
 import {test,expect} from '@playwright/test';
+test.beforeEach(async({page})=>{await page.route('https://api.maptiler.com/maps/**',r=>r.fulfill({json:{version:8,sources:{},layers:[{id:'bg',type:'background',paint:{'background-color':'#edf1f5'}}]}}));});
 test('restaura sessão após F5, duas abas e revoga logout',async({page,context})=>{
  await page.goto('http://localhost:5173');
  await page.getByLabel('Senha de acesso').fill(process.env.DEMO_ADMIN_PASSWORD!);
@@ -30,6 +31,7 @@ test('renova uma vez após credencial HTTP expirada',async({page})=>{
  await page.route('**/graphql',async route=>{
   if(!rejected){rejected=true;await route.fulfill({json:{errors:[{message:'Token inválido',extensions:{code:'UNAUTHENTICATED'}}]}});}else await route.continue();
  });
+ await page.getByTitle('Atualizar dados',{exact:true}).click();
  await expect.poll(()=>refreshes,{timeout:18000}).toBe(1);
  await expect(page.locator('.sidebar-user')).toBeVisible();
 });

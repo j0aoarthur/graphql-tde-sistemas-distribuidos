@@ -19,3 +19,11 @@ const retry=await call('refresh',{},old);assert.equal(retry.status,200);assert.e
 assert.equal((await call('logout',{},current)).status,200);
 assert.equal((await call('refresh',{},current)).status,401);
 console.log('PASSOU: CSRF, login, cookie HttpOnly/Strict, rotação, token federado, conflito concorrente e revogação no PostgreSQL');
+
+const second=await call('login',{email:'central-a@sdv.local',senha:process.env.DEMO_ADMIN_PASSWORD});assert.equal(second.status,200);
+const firstCookie=second.headers.get('set-cookie').split(';')[0];
+const r1=await call('refresh',{},firstCookie),c1=r1.headers.get('set-cookie').split(';')[0];
+const r2=await call('refresh',{},c1),c2=r2.headers.get('set-cookie').split(';')[0];
+assert.equal((await call('refresh',{},firstCookie)).status,401);
+assert.equal((await call('refresh',{},c2)).status,401);
+console.log('PASSOU: reutilização de token histórico revoga a família inteira da sessão');

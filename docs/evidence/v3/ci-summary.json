@@ -1,0 +1,284 @@
+{
+  "commit": "16b5e4710a3d39d47e1dd8a06584f29238f2ffca",
+  "run_id": 41976051692,
+  "url": "https://github.com/j0aoarthur/graphql-tde-sistemas-distribuidos/actions/runs/41976051692",
+  "jobs": [
+    {
+      "id": 127075035270,
+      "name": "Terraform · sintaxe e esquema",
+      "status": "completed",
+      "conclusion": "success",
+      "run_id": 41976051692,
+      "logs_url": null,
+      "steps": [
+        {
+          "name": "Set up job",
+          "status": "completed",
+          "conclusion": "success",
+          "number": 1
+        },
+        {
+          "name": "Run actions/checkout@v4",
+          "status": "completed",
+          "conclusion": "success",
+          "number": 2
+        },
+        {
+          "name": "Run hashicorp/setup-terraform@v3",
+          "status": "completed",
+          "conclusion": "success",
+          "number": 3
+        },
+        {
+          "name": "Run terraform -chdir=infra/terraform fmt -check -recursive",
+          "status": "completed",
+          "conclusion": "success",
+          "number": 4
+        },
+        {
+          "name": "Run terraform -chdir=infra/terraform init -backend=false",
+          "status": "completed",
+          "conclusion": "success",
+          "number": 5
+        },
+        {
+          "name": "Run terraform -chdir=infra/terraform validate",
+          "status": "completed",
+          "conclusion": "success",
+          "number": 6
+        },
+        {
+          "name": "Post Run actions/checkout@v4",
+          "status": "completed",
+          "conclusion": "success",
+          "number": 12
+        },
+        {
+          "name": "Complete job",
+          "status": "completed",
+          "conclusion": "success",
+          "number": 13
+        }
+      ]
+    },
+    {
+      "id": 127075035651,
+      "name": "Backend, frontend e contratos",
+      "status": "completed",
+      "conclusion": "success",
+      "run_id": 41976051692,
+      "logs_url": null,
+      "steps": [
+        {
+          "name": "Set up job",
+          "status": "completed",
+          "conclusion": "success",
+          "number": 1
+        },
+        {
+          "name": "Run actions/checkout@v4",
+          "status": "completed",
+          "conclusion": "success",
+          "number": 2
+        },
+        {
+          "name": "Run actions/setup-node@v4",
+          "status": "completed",
+          "conclusion": "success",
+          "number": 3
+        },
+        {
+          "name": "Run npm install --no-audit --no-fund",
+          "status": "completed",
+          "conclusion": "success",
+          "number": 4
+        },
+        {
+          "name": "Run npm run db:generate",
+          "status": "completed",
+          "conclusion": "success",
+          "number": 5
+        },
+        {
+          "name": "Run npm run lint",
+          "status": "completed",
+          "conclusion": "success",
+          "number": 6
+        },
+        {
+          "name": "Run npm test",
+          "status": "completed",
+          "conclusion": "success",
+          "number": 7
+        },
+        {
+          "name": "Run npm run build",
+          "status": "completed",
+          "conclusion": "success",
+          "number": 8
+        },
+        {
+          "name": "Post Run actions/setup-node@v4",
+          "status": "completed",
+          "conclusion": "success",
+          "number": 15
+        },
+        {
+          "name": "Post Run actions/checkout@v4",
+          "status": "completed",
+          "conclusion": "success",
+          "number": 16
+        },
+        {
+          "name": "Complete job",
+          "status": "completed",
+          "conclusion": "success",
+          "number": 17
+        }
+      ]
+    },
+    {
+      "id": 127075035674,
+      "name": "Contrato GraphQL e concorrência com Redis/PostgreSQL reais",
+      "status": "completed",
+      "conclusion": "success",
+      "run_id": 41976051692,
+      "logs_url": null,
+      "steps": [
+        {
+          "name": "Set up job",
+          "status": "completed",
+          "conclusion": "success",
+          "number": 1
+        },
+        {
+          "name": "Run actions/checkout@v4",
+          "status": "completed",
+          "conclusion": "success",
+          "number": 2
+        },
+        {
+          "name": "Run actions/setup-node@v4",
+          "status": "completed",
+          "conclusion": "success",
+          "number": 3
+        },
+        {
+          "name": "Run npm install --no-audit --no-fund",
+          "status": "completed",
+          "conclusion": "success",
+          "number": 4
+        },
+        {
+          "name": "Run docker compose up -d --wait",
+          "status": "completed",
+          "conclusion": "success",
+          "number": 5
+        },
+        {
+          "name": "Run node scripts/bootstrap-databases.mjs",
+          "status": "completed",
+          "conclusion": "success",
+          "number": 6
+        },
+        {
+          "name": "Run npm run db:generate && npm run db:migrate && npm run seed && npm run build",
+          "status": "completed",
+          "conclusion": "success",
+          "number": 7
+        },
+        {
+          "name": "Iniciar microsserviços e workers",
+          "status": "completed",
+          "conclusion": "success",
+          "number": 8
+        },
+        {
+          "name": "Run npm run test:operations",
+          "status": "completed",
+          "conclusion": "success",
+          "number": 9
+        },
+        {
+          "name": "Run node tests/gps.mjs",
+          "status": "completed",
+          "conclusion": "success",
+          "number": 10
+        },
+        {
+          "name": "Run npm run test:concurrency",
+          "status": "completed",
+          "conclusion": "success",
+          "number": 11
+        },
+        {
+          "name": "Falhas antes de ACK e após commit em Viaturas",
+          "status": "completed",
+          "conclusion": "success",
+          "number": 12
+        },
+        {
+          "name": "Run npm run test:session",
+          "status": "completed",
+          "conclusion": "success",
+          "number": 13
+        },
+        {
+          "name": "E2E v3.2 desktop, mobile e HTTPS local",
+          "status": "completed",
+          "conclusion": "success",
+          "number": 14
+        },
+        {
+          "name": "Run actions/upload-artifact@v4",
+          "status": "completed",
+          "conclusion": "success",
+          "number": 15
+        },
+        {
+          "name": "Run cat /tmp/ocorrencias.log /tmp/viaturas.log /tmp/gateway.log /tmp/worker.log || true",
+          "status": "completed",
+          "conclusion": "skipped",
+          "number": 16
+        },
+        {
+          "name": "Post Run actions/setup-node@v4",
+          "status": "completed",
+          "conclusion": "success",
+          "number": 31
+        },
+        {
+          "name": "Post Run actions/checkout@v4",
+          "status": "completed",
+          "conclusion": "success",
+          "number": 32
+        },
+        {
+          "name": "Complete job",
+          "status": "completed",
+          "conclusion": "success",
+          "number": 33
+        }
+      ]
+    }
+  ],
+  "artifact": {
+    "id": 13392021727,
+    "name": "evidencias-v3",
+    "size_in_bytes": 1134659,
+    "url": "https://api.github.com/repos/j0aoarthur/graphql-tde-sistemas-distribuidos/actions/artifacts/13392021727",
+    "archive_download_url": "https://api.github.com/repos/j0aoarthur/graphql-tde-sistemas-distribuidos/actions/artifacts/13392021727/zip",
+    "expired": false,
+    "created_at": "2026-11-05T05:49:18Z",
+    "expires_at": "2027-02-03T05:45:53Z",
+    "updated_at": "2026-11-05T05:49:18Z",
+    "digest": "sha256:5a44857ec0238364fb1524b94fadd3fa5f3a5cbe8db2271069ad5862bbe09784",
+    "workflow_run": {
+      "id": 41976051692,
+      "repository_id": 1370611182,
+      "head_repository_id": 1370611182,
+      "head_branch": "feat/sdv-v3-operations",
+      "head_sha": "16b5e4710a3d39d47e1dd8a06584f29238f2ffca"
+    }
+  }
+}
