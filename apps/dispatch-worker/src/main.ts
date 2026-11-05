@@ -34,10 +34,12 @@ async function replayFleetOutbox(){
     const {rows}=await client.query(`SELECT id,tipo,payload,"criadoEm" FROM "Outbox" WHERE "publicadoEm" IS NULL ORDER BY "criadoEm" LIMIT 20 FOR UPDATE SKIP LOCKED`);
     for(const row of rows){
       const p=row.payload;
+      const labels:Record<string,string>={DESPACHO_CONFIRMADO:'Despacho confirmado',VIATURA_CHEGOU:'Viatura chegou ao local',ROTA_CALCULADA:'Rota calculada',DESLOCAMENTO_INICIADO:'Deslocamento iniciado',SINAL_PERDIDO:'Sinal de GPS perdido',SINAL_RESTABELECIDO:'Sinal de GPS restabelecido'};
+      const description=row.tipo==='DESPACHO_FINALIZADO'?(p.acao==='CONCLUIDO'?'Atendimento concluído':'Ocorrência cancelada'):(labels[row.tipo]??row.tipo.replaceAll('_',' '));
       const projection=await pool.connect();
       try{
         await projection.query('BEGIN');
-        await projection.query(`INSERT INTO "EventoOcorrencia" (id,"ocorrenciaId",tipo,"ocorridoEm","registradoEm","origemServico","eventIdOrigem",descricao) VALUES(gen_random_uuid(),$1,$2,$3,now(),'VIATURAS',$4,$2) ON CONFLICT ("eventIdOrigem") DO NOTHING`,[p.ocorrenciaId,row.tipo,p.chegadaEm??p.ocorridoEm??row.criadoEm,row.id]);
+        await projection.query(`INSERT INTO "EventoOcorrencia" (id,"ocorrenciaId",tipo,"ocorridoEm","registradoEm","origemServico","eventIdOrigem",descricao) VALUES(gen_random_uuid(),$1,$2,$3,now(),'VIATURAS',$4,$5) ON CONFLICT ("eventIdOrigem") DO NOTHING`,[p.ocorrenciaId,row.tipo,p.chegadaEm??p.ocorridoEm??row.criadoEm,row.id,description]);
       if(row.tipo==='DESPACHO_CONFIRMADO'){
         await projection.query(`UPDATE "Ocorrencia" SET versao=versao+1,status='DESPACHADA',"viaturaId"=$2,"atualizadoEm"=now() WHERE id=$1 AND status IN ('RECEBIDA','AGUARDANDO_VIATURA')`,[p.ocorrenciaId,p.viaturaId]);
       }else if(row.tipo==='VIATURA_CHEGOU'){
