@@ -1,0 +1,17 @@
+{
+  "name": "@sdv/shared",
+  "version": "0.1.0",
+  "private": true,
+  "main": "geo.cjs",
+  "types": "index.d.ts",
+  "exports": {
+    ".": {
+      "types": "./index.d.ts",
+      "default": "./geo.cjs"
+    },
+    "./route": {
+      "types": "./route.d.ts",
+      "default": "./route.cjs"
+    }
+  }
+}

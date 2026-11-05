@@ -1,0 +1,45 @@
+generator client {
+  provider = "prisma-client-js"
+  output   = "../src/generated/client"
+}
+datasource db {
+  provider = "postgresql"
+  url      = env("VIATURAS_DATABASE_URL")
+}
+model Viatura {
+  id            String @id @default(uuid()) @db.Uuid
+  placa         String @unique
+  status        String @default("DISPONIVEL")
+  latitude      Float
+  longitude     Float
+  capacidade    Int @default(1)
+  versao        Int @default(0)
+  atualizadoEm  DateTime @updatedAt
+  despachos     Despacho[]
+  @@index([status])
+}
+model Despacho {
+  id           String @id @default(uuid()) @db.Uuid
+  ocorrenciaId String @unique @db.Uuid
+  viaturaId    String @db.Uuid
+  status       String @default("CONFIRMADO")
+  criadoEm     DateTime @default(now())
+  destinoLat   Float?
+  destinoLon   Float?
+  rota         Json?
+  distanciaMetros Float?
+  duracaoSegundos Float?
+  progresso     Float @default(0)
+  simulacaoPausada Boolean @default(false)
+  rotaErro      String?
+  concluidoEm  DateTime?
+  viatura      Viatura @relation(fields:[viaturaId],references:[id])
+  @@index([viaturaId,status])
+}
+model Outbox {
+  id          String @id @default(uuid()) @db.Uuid
+  tipo        String
+  payload     Json
+  criadoEm    DateTime @default(now())
+  publicadoEm DateTime?
+}

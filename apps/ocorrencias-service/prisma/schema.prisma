@@ -1,0 +1,52 @@
+generator client {
+  provider = "prisma-client-js"
+  output   = "../src/generated/client"
+}
+datasource db {
+  provider = "postgresql"
+  url      = env("OCC_DATABASE_URL")
+}
+model Central {
+  id        String @id @default(uuid()) @db.Uuid
+  codigo    String @unique
+  nome      String
+  ativo     Boolean @default(true)
+  admins    Admin[]
+  ocorrencias Ocorrencia[]
+}
+model Admin {
+  id          String @id @default(uuid()) @db.Uuid
+  centralId   String @db.Uuid
+  nome        String
+  email       String @unique
+  senhaHash   String
+  ativo       Boolean @default(true)
+  papel       String @default("ADMIN")
+  central     Central @relation(fields:[centralId],references:[id])
+}
+model Ocorrencia {
+  id              String @id @default(uuid()) @db.Uuid
+  centralId       String @db.Uuid
+  clientRequestId String
+  tipo            String
+  prioridade      Int
+  latitude        Float
+  longitude       Float
+  status          String @default("RECEBIDA")
+  viaturaId       String? @db.Uuid
+  criadoEm        DateTime @default(now())
+  atualizadoEm    DateTime @updatedAt
+  central         Central @relation(fields:[centralId], references:[id])
+  @@unique([centralId,clientRequestId])
+  @@index([status,criadoEm])
+}
+model Outbox {
+  id           String @id @default(uuid()) @db.Uuid
+  tipo         String
+  payload      Json
+  criadoEm     DateTime @default(now())
+  publicadoEm  DateTime?
+  lockedUntil  DateTime?
+  tentativas   Int @default(0)
+  @@index([publicadoEm,lockedUntil])
+}

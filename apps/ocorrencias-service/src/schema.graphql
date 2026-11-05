@@ -1,0 +1,31 @@
+extend schema @link(url: "https://specs.apollo.dev/federation/v2.3", import: ["@key"])
+type Viatura @key(fields: "id", resolvable: false) { id: ID! }
+type Ocorrencia @key(fields: "id") {
+  id: ID!
+  centralId: ID!
+  tipo: String!
+  prioridade: Int!
+  latitude: Float!
+  longitude: Float!
+  status: String!
+  viaturaId: ID
+  viatura: Viatura
+  criadoEm: String!
+  atualizadoEm: String!
+}
+type Admin { id: ID! nome: String! email: String! centralId: ID! papel: String! }
+type Central { id: ID! codigo: String! nome: String! ativo: Boolean! }
+type LoginResponse { accessToken: String! admin: Admin! }
+input AbrirOcorrenciaInput { tipo: String! prioridade: Int! latitude: Float! longitude: Float! clientRequestId: ID! }
+type Query {
+  me: Admin!
+  listarCentrais: [Central!]!
+  listarOcorrencias(status: String): [Ocorrencia!]!
+  consultarOcorrencia(id: ID!): Ocorrencia
+}
+type Mutation {
+  login(email: String!, senha: String!): LoginResponse!
+  abrirOcorrencia(input: AbrirOcorrenciaInput!): Ocorrencia!
+  encerrarOcorrencia(id: ID!): Ocorrencia!
+  cancelarOcorrencia(id: ID!): Ocorrencia!
+}

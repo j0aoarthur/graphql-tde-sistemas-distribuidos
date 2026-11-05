@@ -1,0 +1,41 @@
+extend schema @link(url: "https://specs.apollo.dev/federation/v2.3", import: ["@key"])
+type Viatura @key(fields:"id") {
+  id: ID!
+  placa: String!
+  status: String!
+  latitude: Float!
+  longitude: Float!
+  capacidade: Int!
+  versao: Int!
+  atualizadoEm: String!
+}
+type Despacho {
+  id: ID!
+  ocorrenciaId: ID!
+  viaturaId: ID!
+  viatura: Viatura!
+  status: String!
+  distanciaMetros: Float
+  duracaoSegundos: Float
+  progresso: Float!
+  rota: String
+  simulacaoPausada: Boolean!
+  criadoEm: String!
+  concluidoEm: String
+}
+type EstadoSimulacao { fator: Float! pausada: Boolean! sinalIndisponivel: Boolean! }
+input NovaViaturaInput { placa: String! latitude: Float! longitude: Float! capacidade: Int! }
+type Query {
+  listarViaturas(status: String): [Viatura!]!
+  consultarViatura(id: ID!): Viatura
+  listarDespachos: [Despacho!]!
+  estadoSimulacao: EstadoSimulacao!
+  consultarDespacho(id: ID!): Despacho
+}
+type Mutation {
+  cadastrarViatura(input: NovaViaturaInput!): Viatura!
+  atualizarPosicaoViatura(id: ID!, latitude: Float!, longitude: Float!): Viatura!
+  pausarSimulacao(despachoId: ID!, pausada: Boolean!): Despacho!
+  configurarSimulacao(fator: Float!, pausada: Boolean!): EstadoSimulacao!
+  simularFalhaGps(segundos: Int!): EstadoSimulacao!
+}
