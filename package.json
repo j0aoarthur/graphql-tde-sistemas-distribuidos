@@ -22,13 +22,16 @@
     "build": "npm run build -w @sdv/gateway && npm run build -w @sdv/ocorrencias && npm run build -w @sdv/viaturas && npm run build -w @sdv/worker && npm run build -w @sdv/frontend && npm run build -w @sdv/simulator",
     "test:concurrency": "NODE_ENV=test node tests/concurrency.mjs",
     "dev:simulator": "npm run dev -w @sdv/simulator",
-    "db:migrate": "npm run db:migrate -w @sdv/ocorrencias && npm run db:migrate -w @sdv/viaturas"
+    "db:migrate": "npm run db:migrate -w @sdv/ocorrencias && npm run db:migrate -w @sdv/viaturas",
+    "test:session": "node tests/session.mjs",
+    "test:e2e": "playwright test"
   },
   "devDependencies": {
-    "typescript": "~5.9.3",
-    "tsx": "^4.20.6",
+    "@playwright/test": "^1.64.1",
     "@types/node": "^22.15.0",
+    "bcryptjs": "^2.4.3",
     "dotenv": "^16.4.7",
-    "bcryptjs": "^2.4.3"
+    "tsx": "^4.20.6",
+    "typescript": "~5.9.3"
   }
 }
