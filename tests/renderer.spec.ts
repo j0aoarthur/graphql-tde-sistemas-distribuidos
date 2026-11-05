@@ -5,7 +5,7 @@ test('renderizador interpola na curva sem cortar quarteirão',async({page})=>{
  await page.goto('http://localhost:5173');
  await page.evaluate(async()=>{
   const path='/src/components/OperationsMap.tsx';const {OperationsMap,along}=await import(/* @vite-ignore */ path);
-  const modules=await (await fetch('/src/main.tsx')).text();const reactPath=modules.match(/"([^"]*\/react\.js[^"]*)"/)![1],domPath=modules.match(/"([^"]*react-dom_client\.js[^"]*)"/)![1];const React=(await import(/* @vite-ignore */ reactPath)).default;const {createRoot}=await import(/* @vite-ignore */ domPath);
+  const modules=await (await fetch('/src/main.tsx')).text();const reactPath=modules.match(/"([^"]*\/react\.js[^"]*)"/)![1],domPath=modules.match(/"([^"]*react-dom_client\.js[^"]*)"/)![1];const React=(await import(/* @vite-ignore */ reactPath)).default;const dom=await import(/* @vite-ignore */ domPath);const createRoot=(dom.default??dom).createRoot;
   const host=document.createElement('div');host.id='renderer-test';Object.assign(host.style,{position:'fixed',inset:'0',zIndex:'9999'});document.body.append(host);const root=createRoot(host);
   const route=[[-12.260,-38.966],[-12.260,-38.962],[-12.256,-38.962]];let version=0;
   (window as any).renderFrame=(progress:number)=>{const p=along(route,progress);version++;root.render(React.createElement(OperationsMap,{vehicles:[{id:'render-car',placa:'TESTE',status:'OCUPADA',latitude:p[0],longitude:p[1],versao:version,capacidade:2,ultimoSinalEm:new Date().toISOString(),direcaoGraus:90}],incidents:[],dispatches:[{id:'render-dispatch',viaturaId:'render-car',ocorrenciaId:'render-incident',status:'EM_DESLOCAMENTO',progresso:progress,rota:JSON.stringify(route)}]}));};
