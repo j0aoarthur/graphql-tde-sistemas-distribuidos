@@ -14,6 +14,8 @@
 | Terraform Single-AZ com serviços gerenciados | Sim | `terraform validate` pendente |
 | GitHub Actions CI e ECS deploy | Sim | Execução na conta pendente |
 | Provisionamento AWS | Não | Não autorizado nem realizado |
-| Alteração no repositório remoto | Não | GitHub negou escrita (403) |
+| Alteração no repositório remoto | **Sim — baseline v2 em `feat/sdv-v2-executable-baseline`** | PR #2 aberto como draft; ainda não mergeado na main nem homologado |
 
 Consulte README.md para reproduzir e requisitos de segurança.
+
+**Atualização de 05/11/2026:** o bloqueio 403 de escrita do GitHub foi resolvido. Os 75 arquivos do baseline v2 estão na branch `feat/sdv-v2-executable-baseline` e no PR #2; esta observação substitui o status histórico acima. Testes unitários offline reexecutados: 5/5 aprovados. Build integrado, Docker, GraphQL E2E, MapTiler e AWS permanecem não validados.
