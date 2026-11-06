@@ -1,10 +1,12 @@
 # Validação Playwright: design e ações
 
-Rodada de 05–06/11/2026 UTC. Código validado: `701c92ec72344047de2e23541b39ecabe83ebe67`, continuação do PR #6, branch `fix/sdv-realistic-motion-form`.
+Rodada de 05–06/11/2026 UTC. Código de UI validado: `701c92ec72344047de2e23541b39ecabe83ebe67`, continuação do PR #6, branch `fix/sdv-realistic-motion-form`.
 
 Foram exercitadas as seis telas operacionais em **1440×900, 1024×900, 820×900, 768×844, 390×844 e 360×844**, com cliques reais do navegador, teclado, screenshots e axe. O backend, PostgreSQL e Redis são reais e isolados; MapTiler/ViaCEP e OSRM usam fixtures explícitas. O fundo neutro das capturas é uma base cartográfica de teste, sem comprovação da cobertura real do provedor.
 
 Resultado local: **28 cenários Playwright únicos aprovados**, compostos pela rodada completa de 27 cenários e pelo cenário adicional do laboratório. Também passaram revalidações direcionadas do modal e da tela de 360 px. Os registros mantêm a contagem de cada comando: [suíte completa](evidence/playwright-design/playwright.log), [laboratório + 360 px](evidence/playwright-design/laboratorio.log), [modal](evidence/playwright-design/modal.log). O CI do PR executa a suíte atual com os 28 cenários em uma rodada.
+
+A rotina de limpeza dos testes foi extraída para helper no commit `6a5d7d85147d3033576e93d6addc16ee4a7e75c8`, preservando os fontes de aplicação de `701c92e`. O cadastro foi [revalidado com esse helper](evidence/playwright-design/cleanup.log) e o lint passou; a verificação não desabilita nenhuma regra.
 
 As **36 combinações de tela/largura** terminaram sem overflow horizontal da página e sem violações axe nos conjuntos `wcag2a` e `wcag2aa`. As tabelas largas continuam com scroll interno, acessível pelo teclado. O [resumo JSON](evidence/playwright-design/summary.json) registra as dimensões medidas, o SHA e os resultados. Foram produzidas 42 capturas de navegador; uma amostra permanente está abaixo e o conjunto completo integra os artefatos do CI.
 

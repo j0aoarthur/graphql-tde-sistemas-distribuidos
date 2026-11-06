@@ -1,4 +1,6 @@
-Código: 701c92ec72344047de2e23541b39ecabe83ebe67
+UI e build/unitários: 701c92ec72344047de2e23541b39ecabe83ebe67
+Helper de limpeza e lint: 6a5d7d85147d3033576e93d6addc16ee4a7e75c8
+Os fontes de apps/ e packages/ são idênticos entre os dois commits.
 
 Comando: npm run build
 
@@ -101,11 +103,4 @@ Comando: npm run lint
 
 > sdv-monorepo@0.1.0 lint
 > eslint .
-
-
-/workspace/sdv-refine/tests/design-actions.spec.ts
-  70:161  error  Unsafe usage of ThrowStatement  no-unsafe-finally
-  70:855  error  Unsafe usage of ThrowStatement  no-unsafe-finally
-
-✖ 2 problems (2 errors, 0 warnings)
 
