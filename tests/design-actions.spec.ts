@@ -1,7 +1,7 @@
 import {test,expect,type Page} from '@playwright/test';
 import {writeFile} from 'node:fs/promises';
 import AxeBuilder from '@axe-core/playwright';
-import {cancelCreated} from './helpers/cleanup';
+import {cancelCreated,removeCreatedVehicle} from './helpers/cleanup';
 const shots='test-results/design-actions';
 async function setup(page:Page){
  await page.route('https://api.maptiler.com/maps/**',r=>r.fulfill({json:{version:8,sources:{},layers:[{id:'test-background',type:'background',paint:{'background-color':r.request().url().includes('dark')?'#263340':'#edf1f5'}}]}}));
@@ -67,7 +67,7 @@ test('cadastro de viatura: mapa, capacidade, validação e persistência',async(
   await page.getByLabel('Identificação / placa').fill(plate);await page.getByLabel('Capacidade',{exact:true}).selectOption('4');await dialog.locator('.maplibregl-canvas').click({position:{x:140,y:130}});await expect(dialog.getByLabel('Local selecionado')).toBeVisible();const accessibility=await new AxeBuilder({page}).include('.modal').withTags(['wcag2a','wcag2aa']).analyze();expect(accessibility.violations.map(v=>({id:v.id,nodes:v.nodes.map(n=>n.failureSummary)}))).toEqual([]);await page.screenshot({path:`${shots}/cadastro-viatura-mobile.png`});
   const response=page.waitForResponse(r=>r.url().endsWith('/graphql')&&!!r.request().postData()?.includes('cadastrarViatura'));await page.getByRole('button',{name:'Cadastrar viatura',exact:true}).click();const body=await(await response).json();expect(body.errors).toBeUndefined();id=body.data.cadastrarViatura.id;await expect(dialog).toHaveCount(0);await page.getByLabel('Buscar viaturas').fill(plate);await expect(page.locator('.data-table tbody tr')).toHaveCount(1);await expect(page.locator('.data-table tbody tr')).toContainText('4 ocupantes');
  }finally{
-  if(id){if(process.env.NODE_ENV!=='test'||!/^postgres(?:ql)?:\/\/[^/]+@(127\.0\.0\.1|localhost):\d+\/viaturas_db$/.test(process.env.VIATURAS_DATABASE_URL??''))throw Error('Limpeza exige banco local isolado de testes');const {Pool}=await import('pg');const pool=new Pool({connectionString:process.env.VIATURAS_DATABASE_URL});const client=await pool.connect();try{await client.query('BEGIN');await client.query('SELECT id FROM "Viatura" WHERE id=$1 AND placa=$2 FOR UPDATE',[id,plate]);await client.query('DELETE FROM "Patrulha" WHERE "viaturaId"=$1',[id]);await client.query('DELETE FROM "TurnoViatura" WHERE "viaturaId"=$1',[id]);const removed=await client.query('DELETE FROM "Viatura" WHERE id=$1 AND placa=$2 AND status=\'DISPONIVEL\'',[id,plate]);expect(removed.rowCount).toBe(1);await client.query('COMMIT');}catch(e){await client.query('ROLLBACK');throw e;}finally{client.release();await pool.end();}}
+  await removeCreatedVehicle(id,plate);
  }
 });
 

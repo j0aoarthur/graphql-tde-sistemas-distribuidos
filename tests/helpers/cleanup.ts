@@ -9,3 +9,15 @@ export async function cancelCreated(request:APIRequestContext,ids:string[],token
   await expect.poll(async()=>['ENCERRADA','CANCELADA'].includes((await call('query($id:ID!){consultarOcorrencia(id:$id){status}}',{id})).consultarOcorrencia.status),{timeout:12000}).toBe(true);
  }
 }
+
+/** Remove only this scenario's available vehicle from an explicitly local test database. */
+export async function removeCreatedVehicle(id:string,plate:string){
+ if(!id)return;
+ if(process.env.NODE_ENV!=='test'||!/^postgres(?:ql)?:\/\/[^/]+@(127\.0\.0\.1|localhost):\d+\/viaturas_db$/.test(process.env.VIATURAS_DATABASE_URL??''))throw Error('Limpeza exige banco local isolado de testes');
+ const {Pool}=await import('pg');const pool=new Pool({connectionString:process.env.VIATURAS_DATABASE_URL}),client=await pool.connect();
+ try{
+  await client.query('BEGIN');const own=await client.query('SELECT id FROM "Viatura" WHERE id=$1 AND placa=$2 FOR UPDATE',[id,plate]);expect(own.rowCount).toBe(1);
+  await client.query('DELETE FROM "Patrulha" WHERE "viaturaId"=$1',[id]);await client.query('DELETE FROM "TurnoViatura" WHERE "viaturaId"=$1',[id]);
+  const removed=await client.query('DELETE FROM "Viatura" WHERE id=$1 AND placa=$2 AND status=\'DISPONIVEL\'',[id,plate]);expect(removed.rowCount).toBe(1);await client.query('COMMIT');
+ }catch(e){await client.query('ROLLBACK');throw e;}finally{client.release();await pool.end();}
+}
