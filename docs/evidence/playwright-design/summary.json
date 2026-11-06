@@ -1,0 +1,264 @@
+{
+  "codeSha": "701c92ec72344047de2e23541b39ecabe83ebe67",
+  "createdAt": "2026-11-06T00:04:05.617116+00:00",
+  "cartography": "MapTiler mock; OSRM fixture. APIs/PostgreSQL/Redis reais, locais e isolados.",
+  "uniquePlaywrightScenarios": 28,
+  "fullLocalRun": 27,
+  "additionalLabAnd360Run": 2,
+  "modalRecheck": 1,
+  "screenshots": 42,
+  "layoutAndAxeChecks": [
+    {
+      "width": 360,
+      "height": 844,
+      "view": "central",
+      "pageWidth": 360,
+      "violations": []
+    },
+    {
+      "width": 360,
+      "height": 844,
+      "view": "frota",
+      "pageWidth": 360,
+      "violations": []
+    },
+    {
+      "width": 360,
+      "height": 844,
+      "view": "historico",
+      "pageWidth": 360,
+      "violations": []
+    },
+    {
+      "width": 360,
+      "height": 844,
+      "view": "laboratorio",
+      "pageWidth": 360,
+      "violations": []
+    },
+    {
+      "width": 360,
+      "height": 844,
+      "view": "mapa",
+      "pageWidth": 360,
+      "violations": []
+    },
+    {
+      "width": 360,
+      "height": 844,
+      "view": "ocorrencias",
+      "pageWidth": 360,
+      "violations": []
+    },
+    {
+      "width": 390,
+      "height": 844,
+      "view": "central",
+      "pageWidth": 390,
+      "violations": []
+    },
+    {
+      "width": 390,
+      "height": 844,
+      "view": "frota",
+      "pageWidth": 390,
+      "violations": []
+    },
+    {
+      "width": 390,
+      "height": 844,
+      "view": "historico",
+      "pageWidth": 390,
+      "violations": []
+    },
+    {
+      "width": 390,
+      "height": 844,
+      "view": "laboratorio",
+      "pageWidth": 390,
+      "violations": []
+    },
+    {
+      "width": 390,
+      "height": 844,
+      "view": "mapa",
+      "pageWidth": 390,
+      "violations": []
+    },
+    {
+      "width": 390,
+      "height": 844,
+      "view": "ocorrencias",
+      "pageWidth": 390,
+      "violations": []
+    },
+    {
+      "width": 768,
+      "height": 844,
+      "view": "central",
+      "pageWidth": 768,
+      "violations": []
+    },
+    {
+      "width": 768,
+      "height": 844,
+      "view": "frota",
+      "pageWidth": 768,
+      "violations": []
+    },
+    {
+      "width": 768,
+      "height": 844,
+      "view": "historico",
+      "pageWidth": 768,
+      "violations": []
+    },
+    {
+      "width": 768,
+      "height": 844,
+      "view": "laboratorio",
+      "pageWidth": 768,
+      "violations": []
+    },
+    {
+      "width": 768,
+      "height": 844,
+      "view": "mapa",
+      "pageWidth": 768,
+      "violations": []
+    },
+    {
+      "width": 768,
+      "height": 844,
+      "view": "ocorrencias",
+      "pageWidth": 768,
+      "violations": []
+    },
+    {
+      "width": 820,
+      "height": 900,
+      "view": "central",
+      "pageWidth": 820,
+      "violations": []
+    },
+    {
+      "width": 820,
+      "height": 900,
+      "view": "frota",
+      "pageWidth": 820,
+      "violations": []
+    },
+    {
+      "width": 820,
+      "height": 900,
+      "view": "historico",
+      "pageWidth": 820,
+      "violations": []
+    },
+    {
+      "width": 820,
+      "height": 900,
+      "view": "laboratorio",
+      "pageWidth": 820,
+      "violations": []
+    },
+    {
+      "width": 820,
+      "height": 900,
+      "view": "mapa",
+      "pageWidth": 820,
+      "violations": []
+    },
+    {
+      "width": 820,
+      "height": 900,
+      "view": "ocorrencias",
+      "pageWidth": 820,
+      "violations": []
+    },
+    {
+      "width": 1024,
+      "height": 900,
+      "view": "central",
+      "pageWidth": 1024,
+      "violations": []
+    },
+    {
+      "width": 1024,
+      "height": 900,
+      "view": "frota",
+      "pageWidth": 1024,
+      "violations": []
+    },
+    {
+      "width": 1024,
+      "height": 900,
+      "view": "historico",
+      "pageWidth": 1024,
+      "violations": []
+    },
+    {
+      "width": 1024,
+      "height": 900,
+      "view": "laboratorio",
+      "pageWidth": 1024,
+      "violations": []
+    },
+    {
+      "width": 1024,
+      "height": 900,
+      "view": "mapa",
+      "pageWidth": 1024,
+      "violations": []
+    },
+    {
+      "width": 1024,
+      "height": 900,
+      "view": "ocorrencias",
+      "pageWidth": 1024,
+      "violations": []
+    },
+    {
+      "width": 1440,
+      "height": 900,
+      "view": "central",
+      "pageWidth": 1440,
+      "violations": []
+    },
+    {
+      "width": 1440,
+      "height": 900,
+      "view": "frota",
+      "pageWidth": 1440,
+      "violations": []
+    },
+    {
+      "width": 1440,
+      "height": 900,
+      "view": "historico",
+      "pageWidth": 1440,
+      "violations": []
+    },
+    {
+      "width": 1440,
+      "height": 900,
+      "view": "laboratorio",
+      "pageWidth": 1440,
+      "violations": []
+    },
+    {
+      "width": 1440,
+      "height": 900,
+      "view": "mapa",
+      "pageWidth": 1440,
+      "violations": []
+    },
+    {
+      "width": 1440,
+      "height": 900,
+      "view": "ocorrencias",
+      "pageWidth": 1440,
+      "violations": []
+    }
+  ]
+}

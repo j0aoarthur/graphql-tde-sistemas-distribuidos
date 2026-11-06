@@ -1,0 +1,111 @@
+Código: 701c92ec72344047de2e23541b39ecabe83ebe67
+
+Comando: npm run build
+
+> sdv-monorepo@0.1.0 build
+> npm run build -w @sdv/gateway && npm run build -w @sdv/ocorrencias && npm run build -w @sdv/viaturas && npm run build -w @sdv/worker && npm run build -w @sdv/frontend && npm run build -w @sdv/simulator
+
+
+> @sdv/gateway@0.1.0 build
+> tsc -p tsconfig.json
+
+
+> @sdv/ocorrencias@0.1.0 build
+> tsc -p tsconfig.json && cp src/schema.graphql dist/schema.graphql && mkdir -p dist/generated/client && cp -R src/generated/client/. dist/generated/client/
+
+
+> @sdv/viaturas@0.1.0 build
+> tsc -p tsconfig.json && cp src/schema.graphql dist/schema.graphql && mkdir -p dist/generated/client && cp -R src/generated/client/. dist/generated/client/
+
+
+> @sdv/worker@0.1.0 build
+> tsc -p tsconfig.json
+
+
+> @sdv/frontend@0.1.0 build
+> tsc --noEmit && vite build
+
+vite v6.4.5 building for production...
+transforming...
+✓ 1730 modules transformed.
+rendering chunks...
+computing gzip size...
+dist/index.html                                               0.63 kB │ gzip:   0.40 kB
+dist/assets/inter-vietnamese-400-normal-DMkecbls.woff2        4.97 kB
+dist/assets/inter-vietnamese-600-normal-Cc8MFFhd.woff2        5.10 kB
+dist/assets/inter-greek-ext-400-normal-DGGRlc-M.woff2         5.26 kB
+dist/assets/inter-greek-ext-600-normal-DRtmH8MT.woff2         5.43 kB
+dist/assets/inter-vietnamese-400-normal-Bbgyi5SW.woff         6.50 kB
+dist/assets/inter-vietnamese-600-normal-BuLX-rYi.woff         6.64 kB
+dist/assets/inter-greek-ext-400-normal-KugGGMne.woff          7.06 kB
+dist/assets/inter-greek-ext-600-normal-B8X0CLgF.woff          7.21 kB
+dist/assets/inter-cyrillic-400-normal-obahsSVq.woff2          7.71 kB
+dist/assets/inter-greek-400-normal-B4URO6DV.woff2             7.78 kB
+dist/assets/inter-greek-600-normal-plRanbMR.woff2             7.94 kB
+dist/assets/inter-cyrillic-600-normal-CWCymEST.woff2          7.97 kB
+dist/assets/inter-cyrillic-400-normal-HOLc17fK.woff           9.78 kB
+dist/assets/inter-greek-400-normal-q2sYcFCs.woff              9.92 kB
+dist/assets/inter-cyrillic-600-normal-4D_pXhcN.woff           9.94 kB
+dist/assets/inter-greek-600-normal-BZpKdvQh.woff             10.03 kB
+dist/assets/inter-cyrillic-ext-400-normal-BQZuk6qB.woff2     10.23 kB
+dist/assets/inter-cyrillic-ext-600-normal-Dfes3d0z.woff2     10.48 kB
+dist/assets/inter-cyrillic-ext-400-normal-DQukG94-.woff      13.34 kB
+dist/assets/inter-cyrillic-ext-600-normal-Bcila6Z-.woff      13.46 kB
+dist/assets/inter-latin-400-normal-C38fXH4l.woff2            23.66 kB
+dist/assets/inter-latin-600-normal-LgqL8muc.woff2            24.45 kB
+dist/assets/inter-latin-400-normal-CyCys3Eg.woff             30.70 kB
+dist/assets/inter-latin-600-normal-CiBQ2DWP.woff             31.26 kB
+dist/assets/inter-latin-ext-400-normal-C1nco2VV.woff2        35.00 kB
+dist/assets/inter-latin-ext-600-normal-D2bJ5OIk.woff2        36.26 kB
+dist/assets/inter-latin-ext-400-normal-77YHD8bZ.woff         47.56 kB
+dist/assets/inter-latin-ext-600-normal-CIVaiw4L.woff         48.67 kB
+dist/assets/maplibre-gl-worker-CMkqA50c.mjs                 519.37 kB
+dist/assets/index-DceLTJqu.css                              126.46 kB │ gzip:  22.68 kB
+dist/assets/index-DxW_JCH5.js                             1,607.46 kB │ gzip: 435.77 kB
+
+(!) Some chunks are larger than 500 kB after minification. Consider:
+- Using dynamic import() to code-split the application
+- Use build.rollupOptions.output.manualChunks to improve chunking: https://rollupjs.org/configuration-options/#output-manualchunks
+- Adjust chunk size limit for this warning via build.chunkSizeWarningLimit.
+✓ built in 4.84s
+
+> @sdv/simulator@0.2.0 build
+> tsc -p tsconfig.json
+
+
+Comando: npm test
+
+> sdv-monorepo@0.1.0 test
+> node --test tests/*.test.cjs
+
+✔ distância zero para mesmo ponto (0.713561ms)
+✔ ordena apenas viaturas livres e com desempate estável (6.861941ms)
+✔ valida latitude e longitude (0.242777ms)
+✔ urban physical motion accelerates gradually, varies per vehicle and slows before a turn (4.946478ms)
+✔ step splitting, complete arrival and no catch-up teleport after a long outage (0.244511ms)
+✔ patrol rejects routes leaving urban perimeter and permits bounded return of legacy positions (0.251691ms)
+✔ recorded OSRM street geometry in Feira: bounded speed, corner braking and stopped arrival (8.31453ms)
+✔ início e fim da rota (1.258525ms)
+✔ interpolação acompanha geometria real (quebra de direção) (0.267094ms)
+✔ reconexão e eventos atrasados não regridem versões ou heartbeat (0.65835ms)
+ℹ tests 10
+ℹ suites 0
+ℹ pass 10
+ℹ fail 0
+ℹ cancelled 0
+ℹ skipped 0
+ℹ todo 0
+ℹ duration_ms 212.436426
+
+Comando: npm run lint
+
+> sdv-monorepo@0.1.0 lint
+> eslint .
+
+
+/workspace/sdv-refine/tests/design-actions.spec.ts
+  70:161  error  Unsafe usage of ThrowStatement  no-unsafe-finally
+  70:855  error  Unsafe usage of ThrowStatement  no-unsafe-finally
+
+✖ 2 problems (2 errors, 0 warnings)
+

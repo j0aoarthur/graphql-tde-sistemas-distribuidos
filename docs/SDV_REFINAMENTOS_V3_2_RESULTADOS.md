@@ -1,5 +1,7 @@
 # Resultados do refinamento SDV v3.2
 
+Validação adicional de design e ações: [rodada Playwright em seis larguras](SDV_PLAYWRIGHT_DESIGN_ACOES.md). Os resultados abaixo preservam o registro da entrega anterior.
+
 Data: 2026-11-05. Código validado: `6e39dd9583d8882524030eef28f5cd269fb29e59`. Branch: `fix/sdv-realistic-motion-form`, baseada no PR #5 (`feat/sdv-v3-operations`). Commits posteriores deste incremento acrescentam somente documentação e evidências.
 
 **Resultado local: 10 testes unitários e 16 testes Playwright aprovados, build dos seis apps, lint e integração PostgreSQL/Redis aprovados.** Testes executados com Node.js 24.22.1, PostgreSQL 16 e Redis 7, em serviços isolados das execuções anteriores. A validação de infraestrutura executou somente Terraform fmt/init/validate, sem plan/apply/deploy.
