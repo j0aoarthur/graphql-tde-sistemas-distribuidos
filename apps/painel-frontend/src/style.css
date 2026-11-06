@@ -53,3 +53,12 @@ button:focus-visible,input:focus-visible,textarea:focus-visible,select:focus-vis
 .map-shell--picking{display:grid;grid-template-rows:minmax(0,1fr) auto auto}.map-shell--picking .operations-map{grid-row:1;min-height:0;height:100%}.map-shell--picking .map-warning{position:static;grid-row:2;border-radius:0;margin:0}.map-shell--picking .map-pick-help{position:static;grid-row:3;border-radius:0;border-width:1px 0 0;box-shadow:none;margin:0;max-width:none;font-size:13px;padding:10px 12px}.map-shell--picking .map-controls{bottom:auto}
 .nav-count{background:#b73529;color:#fff}
 .create-incident .eyebrow{color:#b73529}
+
+/* Contraste e ações revisados com Playwright em todas as telas operacionais. */
+.tabs button,.data-table th,.data-table small,.mono-inline,.coordinates-inline,.count-label,.section-eyebrow,.slider-range,.sim-status-items>div>span,.empty>span{color:#475569}.tabs button.selected{color:#172534}.badge--neutral{color:#475569;background:#f1f3f5}.eyebrow{color:#b73529}.lab-note{color:#2c5267}.table-action{color:#334e68;background:#fff}.table-action:hover{background:#edf3fa}.table-scroll:focus-visible{outline:3px solid #235fa4;outline-offset:-3px}.table-scroll{max-width:100%;min-width:0}
+.map-legend{display:block}.map-legend-items{display:flex;flex-wrap:wrap;gap:8px 14px}.map-legend>summary{display:none}.map-legend--compact{pointer-events:auto}.map-legend--compact>summary{display:flex;align-items:center;gap:8px;cursor:pointer;list-style:none;min-height:24px;font-weight:600}.map-legend--compact[open]>.map-legend-items{margin-top:10px}.map-legend>summary:focus-visible{outline:3px solid #235fa4;outline-offset:4px;border-radius:3px}
+@media(max-width:800px){.operational-kpis{display:grid;grid-template-columns:repeat(3,minmax(0,1fr));gap:10px 8px}.operational-kpis>div{min-width:0}.map-legend-items{gap:6px 10px}}
+@media(max-width:600px){.topbar{padding:0 12px;gap:8px}.topbar-left{min-width:0;flex:1;gap:8px}.menu-btn{flex:none}.breadcrumb{min-width:0;flex:1;gap:0}.breadcrumb-prefix,.breadcrumb>svg{display:none}.breadcrumb strong{overflow:hidden;white-space:nowrap;text-overflow:ellipsis}.topbar-right{flex:none;gap:6px}}
+.search-box input::placeholder{color:#64748b}
+@media(max-width:850px){.sidebar{visibility:hidden}.sidebar--open{visibility:visible}}
+.coordinates small,.form-tip{color:#475569}
