@@ -1,12 +1,12 @@
 import type {LatLon} from '../types';
-export type Place={point:LatLon;address:string;origin:string;precision:string;bairro?:string;cep?:string;numero?:string;complemento?:string};
+export type Place={point:LatLon;address:string;origin:string;precision:string;bairro?:string;cep?:string;numero?:string;complemento?:string;street?:string};
 const key=import.meta.env.VITE_MAPTILER_API_KEY;
 const inArea=(p:number[])=>p.length===2&&p.every(Number.isFinite)&&p[1]>=-12.45&&p[1]<=-12.05&&p[0]>=-39.15&&p[0]<=-38.75;
 function normalize(x:any):Place|null{
  const p=x.center??x.geometry?.coordinates;if(!Array.isArray(p)||!inArea(p))return null;
  const context=[x,...(Array.isArray(x.context)?x.context:[])];
  const part=(types:string[])=>context.find(c=>types.some(t=>c.id?.startsWith(t+'.')||c.place_type?.includes(t)))?.text;
- return {point:[p[1],p[0]],address:x.place_name??x.text??'',origin:'ENDERECO',precision:'APROXIMADA',bairro:part(['neighbourhood','neighborhood','quarter','suburb']),cep:part(['postal_code','postcode']),numero:typeof x.address==='string'?x.address:undefined};
+ return {point:[p[1],p[0]],address:x.place_name??x.text??'',origin:'ENDERECO',precision:'APROXIMADA',bairro:part(['neighbourhood','neighborhood','quarter','suburb']),cep:part(['postal_code','postcode']),numero:typeof x.address==='string'?x.address:undefined,street:x.place_type?.includes('address')&&typeof x.text==='string'?x.text:undefined};
 }
 export async function geocode(query:string,signal:AbortSignal,reverse=false):Promise<Place[]>{
  if(!key)throw Error('Busca indisponível. Selecione o pin e informe uma referência.');

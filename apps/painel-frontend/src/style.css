@@ -62,3 +62,11 @@ button:focus-visible,input:focus-visible,textarea:focus-visible,select:focus-vis
 .search-box input::placeholder{color:#64748b}
 @media(max-width:850px){.sidebar{visibility:hidden}.sidebar--open{visibility:visible}}
 .coordinates small,.form-tip{color:#475569}
+/* Campos obrigatórios (formulário de ocorrência). Marcadores via CSS: não entram no texto do <label>,
+   então o nome acessível dos campos (e os seletores dos testes) permanece igual. */
+.create-incident .req::after{content:" *";color:#b73529;font-weight:700}
+.create-incident .opt::after{content:" (opcional)";color:#586b7f;font-weight:400;font-size:12px}
+.create-incident .req-mark{color:#b73529;font-weight:700}
+.create-incident .required-legend{font-size:13px;color:#475569;margin:0 0 14px}
+.create-incident :is(input,textarea,select):user-invalid{border-color:#b73529;background:#fff7f6}
+.create-incident .pending-fields{margin:0 auto 0 0;font-size:13px;color:#8a292b}
