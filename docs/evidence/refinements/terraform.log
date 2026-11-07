@@ -1,0 +1,21 @@
+Código validado: 6e39dd9583d8882524030eef28f5cd269fb29e59
+Ambiente local isolado; 2026-11-05 UTC.
+
+Comando: terraform fmt -check -recursive (exit 0); terraform init -backend=false; terraform validate
+Initializing provider plugins...
+- Reusing previous version of hashicorp/aws from the dependency lock file
+- Installing hashicorp/aws v5.100.0...
+- Installed hashicorp/aws v5.100.0 (signed by HashiCorp)
+
+Terraform has been successfully initialized!
+
+You may now begin working with Terraform. Try running "terraform plan" to see
+any changes that are required for your infrastructure. All Terraform commands
+should now work.
+
+If you ever set or change modules or backend configuration for Terraform,
+rerun this command to reinitialize your working directory. If you forget, other
+commands will detect it and remind you to do so if necessary.
+Success! The configuration is valid.
+
+

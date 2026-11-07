@@ -1,0 +1,55 @@
+Código validado: 6e39dd9583d8882524030eef28f5cd269fb29e59
+Ambiente local isolado; 2026-11-05 UTC.
+
+Comando: npm run test:operations
+
+> sdv-monorepo@0.1.0 test:operations
+> node tests/operations.mjs && node tests/race.mjs && node tests/metrics.mjs
+
+PASSOU: prévia OSRM Table sem reserva, validação/metadata, idempotência, ETA real alocado, chegada canônica, replay auditável, heartbeat parado, autorização, encerramento, retomada da patrulha e estatísticas Bahia em PostgreSQL/Redis reais; OSRM usa fixture
+PASSOU: duas réplicas sobre o mesmo frame e replay não duplicam progresso nem versão no PostgreSQL
+PASSOU: fronteira 02:59/03:00 UTC em America/Bahia e distinção entre concluídos e cancelados e paginação por cursor via GraphQL/PostgreSQL
+
+Comando: node tests/urban-motion.mjs
+PASSOU: 1×, aceleração após parada, limites físicos entre amostras, velocidades distintas e patrulha dentro de raio urbano simulado de 6 km
+
+Comando: node tests/routing-latency.mjs
+PASSOU: atraso OSRM de 4 s não bloqueia GPS/heartbeat da frota; rota pendente é instalada posteriormente por CAS
+
+Comando: node tests/gps.mjs
+PASSOU: perda de GPS congela coordenadas/versão, timeout distinto e heartbeat restaura estado canônico
+
+Comando: npm run test:concurrency
+
+> sdv-monorepo@0.1.0 test:concurrency
+> NODE_ENV=test node tests/concurrency.mjs
+
+PASSOU: duas centrais, concorrência GraphQL, nenhuma viatura duplicada [
+  {
+    id: '5390c928-e15b-4274-9123-26d8fa744c43',
+    status: 'DESPACHADA',
+    viaturaId: '2c37efef-9a5f-4291-a235-5cca5c349ac0'
+  },
+  {
+    id: '803a3653-e138-4705-98de-2441606e9a55',
+    status: 'DESPACHADA',
+    viaturaId: 'bc019d6c-a7c3-49a0-a723-6c8bd462c932'
+  }
+]
+
+Comando: SDV_WORKER_CONTROL=1 npm run test:recovery
+
+> sdv-monorepo@0.1.0 test:recovery
+> node tests/recovery.mjs
+
+PASSOU: crash AFTER_FLEET_COMMIT, pending recuperado e projeção convergente sem despacho duplicado
+PASSOU: crash BEFORE_ACK, pending recuperado e projeção convergente sem despacho duplicado
+
+Comando: npm run test:session
+
+> sdv-monorepo@0.1.0 test:session
+> node tests/session.mjs
+
+PASSOU: CSRF, login, cookie HttpOnly/Strict, rotação, token federado, conflito concorrente e revogação no PostgreSQL
+PASSOU: reutilização de token histórico revoga a família inteira da sessão
+

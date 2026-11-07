@@ -16,6 +16,10 @@
     "./state": {
       "types": "./state.d.ts",
       "default": "./state.cjs"
+    },
+    "./motion": {
+      "types": "./motion.d.ts",
+      "default": "./motion.cjs"
     }
   }
 }

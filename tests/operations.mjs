@@ -28,12 +28,12 @@ try{
  const duplicate=(await query(create,{i:input},a)).abrirOcorrencia;assert.equal(duplicate.id,created.id);
  await assert.rejects(query(create,{i:{...input,descricao:'Outro conteúdo'}},a));
  const initial=await until(async()=>{const r=await fleet.query('SELECT * FROM "Despacho" WHERE "ocorrenciaId"=$1',[created.id]);return r.rows[0]?.etaOriginalSegundos?r.rows[0]:null;});
- assert.ok(initial.etaOriginalSegundos>0);
+ assert.ok(initial.etaOriginalSegundos>0);assert.ok(initial.previsaoChegadaInicialEm);
  await query('mutation{configurarSimulacao(fator:60,pausada:true){fator}}',{},a);
  const pausedForecast=(await fleet.query('SELECT * FROM "Despacho" WHERE id=$1',[initial.id])).rows[0];assert.equal(pausedForecast.previsaoChegadaEm,null);assert.equal(pausedForecast.etaOriginalSegundos,initial.etaOriginalSegundos);
  await query('mutation{configurarSimulacao(fator:60,pausada:false){fator}}',{},a);
  const arrival=await until(async()=>{const r=await fleet.query('SELECT * FROM "Despacho" WHERE "ocorrenciaId"=$1',[created.id]);return r.rows[0]?.chegadaEm?r.rows[0]:null;});
- assert.equal(arrival.etaOriginalSegundos,initial.etaOriginalSegundos);assert.equal(arrival.etaAtualSegundos,0);
+ assert.equal(arrival.previsaoChegadaInicialEm.toISOString(),initial.previsaoChegadaInicialEm.toISOString());assert.equal(arrival.etaOriginalSegundos,initial.etaOriginalSegundos);assert.equal(arrival.etaAtualSegundos,0);
  assert.equal((await fleet.query('SELECT status FROM "Patrulha" WHERE "viaturaId"=$1',[arrival.viaturaId])).rows[0].status,'SUSPENSA');
  assert.equal(arrival.status,'NO_LOCAL');assert.equal(arrival.progresso,1);assert.ok(arrival.etaOriginalSegundos>0);
  await until(async()=>{const r=await occ.query('SELECT * FROM "EventoOcorrencia" WHERE "ocorrenciaId"=$1 AND tipo=\'VIATURA_CHEGOU\'',[created.id]);return r.rows[0];});

@@ -47,6 +47,7 @@ model Despacho {
   saidaEm DateTime? @db.Timestamptz(3)
   etaOriginalSegundos Float?
   etaAtualSegundos Float?
+  previsaoChegadaInicialEm DateTime? @db.Timestamptz(3)
   previsaoChegadaEm DateTime? @db.Timestamptz(3)
   previsaoAtualizadaEm DateTime? @db.Timestamptz(3)
   fatorSimulacaoAplicado Float?
