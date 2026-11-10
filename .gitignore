@@ -4,6 +4,7 @@ dist/
 .env.*
 !.env.example
 *.tfstate*
+*.tfplan
 .terraform/
 *.tfvars
 !.tfvars.example

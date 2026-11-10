@@ -50,7 +50,7 @@ variable "redis_node_type" {
 variable "monthly_budget_usd" {
 
   type    = number
-  default = 60
+  default = 20
 
 }
 variable "alert_email" {
