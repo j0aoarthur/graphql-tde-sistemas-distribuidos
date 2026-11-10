@@ -4,13 +4,15 @@ Base da análise: commit `7d53886`, comparado com `Documentação Técnica - SDV
 
 Este plano define o que será implementado, o que será mantido diferente e por quê. Nenhum item abaixo está implementado ainda. Cada critério só poderá ser marcado como **PASSOU**, **FALHOU** ou **BLOQUEADO** com teste executável, log e SHA, conforme o `AGENTS.md`.
 
-## 1. Decisões que precisam de confirmação
+## 1. Decisões confirmadas (2026-11-10)
 
-| # | Decisão | Recomendação | Impacto |
-|---|---|---|---|
-| D1 | Failover real exige sair da regra "Single-AZ" do `AGENTS.md` | Adotar `ha_enabled=true` como alvo e atualizar o `AGENTS.md`; o `terraform apply` continua dependendo de autorização explícita | Aumenta o custo AWS: 2 RDS Multi-AZ, Redis com réplica e no mínimo 2 tarefas por serviço |
-| D2 | Runtime do gateway para subscriptions federadas | **Hive Gateway** (seção 4.3); Apollo Router v2 fica como plano B | Troca o runtime do gateway, mas mantém os subgrafos Apollo Federation v2 |
-| D3 | Domínio próprio para `api.` e `staging.api.` | Parametrizar em Terraform; sem domínio, o item fica BLOQUEADO | Necessário também para HTTPS entre CloudFront e ALB |
+| # | Decisão | Consequência no plano |
+|---|---|---|
+| D1 | **Single-AZ**, para reduzir custo | Não há failover entre zonas. A resiliência vem de réplicas de tarefa, recuperação automática do RDS e garantias de entrega na aplicação (seção 4.4). O `AGENTS.md` continua válido. |
+| D2 | **Hive Gateway** | Apollo Router deixa de ser plano B. A PoC valida a integração e, se algum critério falhar, ajusta-se o transporte ou a configuração, sem trocar de gateway (seção 4.3). |
+| D3 | **Domínio `joaoarthur.com`**, com subdomínios | Delegar `sdv.joaoarthur.com` ao Route 53 em uma stack persistente, fora do ciclo de demonstração (seção 4.6). |
+
+O `terraform apply` continua dependendo de autorização explícita.
 
 ## 2. Arquitetura-alvo
 
@@ -28,7 +30,7 @@ flowchart LR
   WK -->|REST interno + circuit breaker| VI
   WK -->|REST interno + circuit breaker| OC
   VI -->|Tabela de ETA| OSRM[OSRM]
-  VI -. lock e GEO .-> RD[(Redis HA)]
+  VI -. lock e GEO .-> RD[(Redis)]
   OC -. Pub/Sub .-> RD
   VI -. Pub/Sub .-> RD
 ```
@@ -50,9 +52,9 @@ Legenda: **Implementar** (falta), **Completar** (parcial), **Manter** (diferente
 | Helmet | Ausente | **Implementar** no gateway; CSP do painel via CloudFront | F4 |
 | Auto scaling 80% / 30% | Réplicas fixas | **Implementar** step scaling de CPU e memória | F6 |
 | Cache quente de posições no Redis | Ausente | **Implementar** com `GEOADD`/`GEOSEARCH` | F3 |
-| Dev, Staging e Prod | Um ambiente | **Implementar** com GitHub Environments e `var.environment` | F6 |
-| DNS externo por ambiente | Sem Route 53 | **Implementar** de forma parametrizada (D3) | F6 |
-| Failover | Single-AZ, sem réplica | **Implementar** (D1) | F6 |
+| Dev, Staging e Prod | Um ambiente | **Implementar** com GitHub Environments, `var.environment` e um state por ambiente | F6 |
+| DNS externo por ambiente | Sem Route 53 | **Implementar** com subdomínios de `joaoarthur.com` (seção 4.6) | F6 |
+| Failover | Single-AZ, sem réplica | **Implementar dentro da zona** (D1, seção 4.4) | F2, F6 |
 
 ### 3.2 Implementado parcialmente
 
@@ -61,7 +63,7 @@ Legenda: **Implementar** (falta), **Completar** (parcial), **Manter** (diferente
 | Database-per-service | O worker foi criado como atalho para evitar transação distribuída e escreve nos dois bancos; uma única instância e todas as tarefas recebem as duas URLs | **Completar** (seção 4.1) | F1, F6 |
 | Subscriptions | `@apollo/gateway` não executa subscriptions, então foi criado um schema paralelo que só avisa o cliente | **Completar** (seção 4.3) | F4 |
 | Autorização por central | Escrita é restrita; leitura é global; existe um único papel | **Completar**: `OPERADOR` e `ADMIN`, ocorrências filtradas pela central do token, frota compartilhada visível | F5 |
-| Balanceamento | ALB só no gateway; internos em DNS, e o keep-alive tende a fixar o tráfego em uma réplica | **Completar** com ALB interno e zona privada `sdv.internal` | F6 |
+| Balanceamento | ALB só no gateway; internos em DNS, e o keep-alive tende a fixar o tráfego em uma réplica | **Completar** com ECS Service Connect: balanceamento por requisição entre réplicas, sem o custo por hora de um ALB interno | F6 |
 | Connection draining | Só padrões | **Completar**: `deregistration_delay`, `stopTimeout` e fechamento ordenado de conexões | F6 |
 | Connection pooling | Prisma no padrão | **Completar** com `connection_limit` explícito, seguindo `réplicas_máx × limite + relay + reserva < max_connections` | F6 |
 | Durabilidade do stream | AOF só no Compose; o PostgreSQL é a fonte real | **Completar** (seção 4.4) | F2, F6 |
@@ -69,7 +71,7 @@ Legenda: **Implementar** (falta), **Completar** (parcial), **Manter** (diferente
 | Viatura mais próxima | Haversine no despacho, OSRM só na prévia | **Completar** (seção 4.5) | F3 |
 | Fila com recuperação | Sem dead-letter queue e sem limite de tamanho | **Completar** com DLQ após 5 entregas e `MAXLEN ~` | F2 |
 | HS256/RS256 | Segredo simétrico compartilhado; qualquer serviço conseguiria emitir tokens | **Completar** com RS256: chave privada só em Ocorrências | F5 |
-| TLS interno | CloudFront fala HTTP com o ALB | **Completar** após D3 | F6 |
+| TLS até o ALB | CloudFront fala HTTP com o ALB | **Completar** com HTTPS na origem `api.sdv.joaoarthur.com` (seção 4.6) | F6 |
 
 ### 3.3 Diferente, e mantido com justificativa
 
@@ -141,7 +143,7 @@ Matriz de teste (duas centrais, **uma** viatura disponível, que o teste atual n
 | Código atual de borda (`/auth`, CORS, limites) | Continua em Node | Requer Rhai ou coprocessador |
 | Testes de reconexão | Preservados | Precisam ser reescritos |
 
-**Recomendação: Hive Gateway.** Os subgrafos seguem Apollo Federation v2; muda apenas o runtime da composição, e isso será registrado nas diferenças.
+**Decisão: Hive Gateway** (D2). Os subgrafos seguem Apollo Federation v2; muda apenas o runtime da composição, e isso será registrado nas diferenças.
 
 Implementação:
 
@@ -153,26 +155,32 @@ Implementação:
 - O painel recebe entidades tipadas e **continua refazendo a consulta ao reconectar**, pois o Pub/Sub é transitório.
 - `eventoSDV` e o schema paralelo são removidos.
 
-PoC obrigatória antes da troca (critério de saída): subscription com campo de outro subgrafo, propagação do JWT, fechamento `4403` na expiração, reconexão e compatibilidade com o limite de profundidade. Se algum falhar, a troca vai para o Apollo Router.
+PoC obrigatória antes da troca (critérios de saída): subscription com campo de outro subgrafo, propagação do JWT, fechamento `4403` na expiração, reconexão, compatibilidade com o limite de profundidade e confirmação da licença no repositório do Hive Gateway. Se algum critério falhar, ajusta-se o transporte (SSE ou WebSocket) ou a configuração, mantendo o Hive.
 
-### 4.4 Failover e durabilidade
+### 4.4 Failover e durabilidade em Single-AZ
+
+Com Single-AZ (D1) não existe failover entre zonas, e isso será dito explicitamente na documentação. O objetivo passa a ser: **nenhuma falha de processo ou de nó perde chamado ou duplica despacho**, e o sistema volta sozinho.
 
 | Falha | Comportamento-alvo | Prova |
 |---|---|---|
-| Worker cai | `XAUTOCLAIM` retoma | Teste local |
+| Tarefa cai (gateway, serviços, worker) | Outra réplica atende; o ECS repõe a tarefa | Local (`docker kill`) e AWS autorizada |
+| Worker cai no meio do processamento | `XAUTOCLAIM` retoma | Teste local |
 | Viaturas fora | Circuit breaker abre, mensagens ficam no stream, ocorrências seguem sendo abertas | Teste local |
-| Redis primário cai | Promoção automática; clientes reconectam | Compose com Sentinel |
-| Evento perdido no failover | Republicado por falta de confirmação | Teste local |
-| PostgreSQL reinicia | Reconexão sem duplicidade | Teste local |
-| Failover RDS | Multi-AZ | `reboot --force-failover`: BLOQUEADO até haver autorização |
-| Tarefa ou AZ cai | Outra AZ continua servindo | Só em ambiente AWS autorizado |
+| Redis cai ou perde dados | Relay republica o que não foi confirmado; reconciliação pelo PostgreSQL; despacho segue sem lock | Teste local com Redis apagado |
+| Redis primário cai, com réplica | Promoção automática | Compose com Sentinel, sem custo |
+| PostgreSQL reinicia | Reconexão com retry, sem duplicidade | Teste local |
+| Host do RDS falha | O RDS substitui a instância; o armazenamento é preservado; indisponível por minutos | Comportamento gerenciado; teste AWS BLOQUEADO até autorização |
+| Zona inteira cai | **Fora de cobertura**, por decisão de custo | Documentado como limitação |
 
 Pontos centrais:
 
-- O PDF promete "persistência garantida em disco", mas a replicação do ElastiCache é assíncrona. Para não haver perda silenciosa, a Outbox passa a ter `confirmadoEm`: o evento só é considerado entregue depois de aplicado, e o relay republica o que não foi confirmado.
-- `WAIT` após o `XADD` reduz a janela de perda.
-- Terraform: `multi_az`, backup de 7 dias, `deletion_protection`, snapshot final, `aws_elasticache_replication_group` com failover automático e TLS, tarefas em duas subnets, mínimo de 2 réplicas nos serviços.
-- `AOF` segue no Compose; o comportamento equivalente na AWS será confirmado na F6, com MemoryDB como opção caso se exija durabilidade do próprio stream.
+- **A durabilidade fica na aplicação, não no Redis.** O PDF promete "persistência garantida em disco", mas um Redis de nó único pode perder entradas. A Outbox ganha `confirmadoEm`: o evento só conta como entregue depois de aplicado no destino, e o relay republica o que não foi confirmado.
+- **Redis na AWS:** nó único por padrão, por custo. A variável `redis_replicas` (0 ou 1) permite uma réplica **na mesma zona** com failover automático, protegendo contra perda de nó, mas não de zona. Sentinel e Compose demonstram o failover sem custo.
+- **Réplicas de tarefa:** mínimo de 2 para gateway, ocorrências, viaturas e worker, porque é o que dá continuidade dentro da zona. A variável `min_replicas` permite usar 1 em ensaios baratos.
+- **RDS:** Single-AZ com backup automático e restauração para ponto no tempo durante a vida do ambiente.
+- **Ciclo subir/destruir:** como os scripts `demo-up.sh` e `demo-down.sh` destroem o ambiente, a variável `ambiente_efemero` controla `force_destroy`, `recovery_window_in_days`, `deletion_protection` e o snapshot final. Ligada na demonstração e desligada em produção.
+- **Restauração:** `demo-up.sh --restaurar <snapshot>` recupera os bancos a partir do snapshot oferecido pelo `demo-down.sh`. Hoje o snapshot é criado, mas não há caminho de restauração.
+- `WAIT` após o `XADD` reduz a janela de perda quando houver réplica.
 
 ### 4.5 Viatura mais próxima
 
@@ -194,6 +202,27 @@ Limites assumidos: o OSRM não considera trânsito em tempo real, e a posição 
 
 Testes: caso em que a mais próxima em linha reta não é a de menor tempo; prévia igual ao despacho; degradação; latência medida com `tests/routing-latency.mjs`, com meta inicial de p95 ≤ 300 ms a confirmar por medição.
 
+### 4.6 Domínio e DNS
+
+O `joaoarthur.com` usa hoje o DNS da Hostinger (`ns1/ns2.dns-parking.com`), e o domínio raiz aponta para o GitHub Pages. Não há registro CAA, então o ACM pode emitir certificados.
+
+**Nomes**, no padrão da documentação (`api.sdv.exemplo.com` e `staging.api.sdv.exemplo.com`):
+
+| Ambiente | Painel (CloudFront) | API (ALB com HTTPS) |
+|---|---|---|
+| Produção | `sdv.joaoarthur.com` | `api.sdv.joaoarthur.com` |
+| Staging | `staging.sdv.joaoarthur.com` | `staging.api.sdv.joaoarthur.com` |
+
+**Delegação.** Criar a zona `sdv.joaoarthur.com` no Route 53 e adicionar, uma única vez, os 4 registros NS dessa zona no painel da Hostinger. O resto do domínio continua na Hostinger, e o site principal não é afetado.
+
+**Stack persistente.** A zona e o certificado ficam em `infra/terraform/dns`, fora do `demo-down.sh`. Se ficassem na stack destruída, cada ciclo geraria novos NS, exigiria nova delegação e revalidaria o certificado. Isso também resolve um problema descrito no README: **a URL deixa de mudar a cada subida**, pois o alias aponta para o novo CloudFront.
+
+**Certificado ACM** em `us-east-1`, a mesma região do CloudFront e do ALB, com os nomes `sdv.joaoarthur.com`, `*.sdv.joaoarthur.com` e `*.api.sdv.joaoarthur.com`. O curinga `*.sdv` não cobre `staging.api.sdv`, por isso entra o terceiro nome.
+
+**TLS de ponta a ponta.** O ALB ganha listener 443 com o certificado e redireciona a porta 80. O CloudFront usa `api.sdv.joaoarthur.com` como origem, com `https-only`. O painel continua chamando `/graphql` e `/auth` na mesma origem pelo CloudFront, preservando o cookie `SameSite=Strict`, e a API também fica acessível diretamente pelo subdomínio.
+
+**Validação:** `dig NS sdv.joaoarthur.com`, certificado emitido, `curl -I https://api.sdv.joaoarthur.com/health` e `tests/https.spec.ts` apontando para o domínio. Fica BLOQUEADO até a delegação na Hostinger e um `apply` autorizado.
+
 ## 5. Fases de entrega
 
 Cada fase é um PR pequeno e empilhado.
@@ -206,13 +235,19 @@ Cada fase é um PR pequeno e empilhado.
 | **F3** | Concorrência e ranking: GEO, ETA, lock degradável, métricas, teste com uma viatura | Matrizes das seções 4.2 e 4.5 |
 | **F4** | Gateway Hive, subscriptions federadas, Helmet, limite de profundidade e complexidade, rate limit distribuído | `tests/websocket.spec.ts` adaptado; limite compartilhado entre 2 réplicas; consulta profunda rejeitada |
 | **F5** | Identidade: remover a mutation `login`, RS256, papéis, escopo por central, token interno por consumidor com `timingSafeEqual` | `tests/session.mjs`; login sem rota alternativa ao limitador; rejeição de confusão de algoritmo; matriz de papéis |
-| **F6** | Infra: 2 RDS, Redis HA, ALB interno, autoscaling, draining, pooling, ambientes, DNS | `terraform fmt -check` e `validate`; sem `apply` sem autorização |
+| **F6** | Infra Single-AZ: 2 RDS, `redis_replicas`, Service Connect, autoscaling, draining, pooling, ambientes, stack `dns`, HTTPS na origem, `ambiente_efemero`, restauração de snapshot, state remoto obrigatório | `terraform fmt -check` e `validate` nas duas stacks; sem `apply` sem autorização |
 | **F7** | Documentação final, slides e evidências | Relatório PASSOU/FALHOU/BLOQUEADO com SHA |
 
 Observações:
 
 - **Falha atual de segurança:** a mutation GraphQL `login` contorna o limitador de `/auth/login`. Ela é usada por 8 arquivos (testes e `App.tsx`), migrados na F5. Se a pilha demorar, o limitador pode ser aplicado à mutation antes, como correção isolada.
 - **Autoscaling:** a documentação pede limiares diferentes para subir e descer, portanto será step scaling com alarmes, não target tracking. Worker usa CPU, como documentado; `lag` do stream fica como melhoria.
+- **Service Connect:** gateway e subgrafo conversam por SSE, uma conexão longa. O timeout por requisição do proxy precisa ser desativado ou ampliado nessas rotas; isso será confirmado na F6.
+- **Ciclo de demonstração (scripts de `c572ad9`), correções incluídas na F6:**
+  - `demo-down.sh` trata erro de `terraform state list` como "state vazio" e sai com código 0. Se as credenciais falharem, informa que não há nada a destruir, e os recursos continuam cobrando.
+  - O state é local por padrão. Se a pasta for perdida, o `demo-down.sh` não enxerga os recursos e eles continuam cobrando. O backend S3 de `scripts/bootstrap-tf-state.sh` passa a ser obrigatório nos scripts.
+  - Com `ignore_changes = [task_definition]`, rodar `demo-up.sh --services <nova tag>` em um ambiente já ativo não troca a imagem em execução. O script deve avisar e usar `deploy.yml` ou forçar a atualização.
+  - Rodar `demo-up.sh` sem `--services` em um ambiente com serviços ativos planeja a remoção deles. Há confirmação, mas o script deve alertar antes.
 
 ## 6. Tópico novo da documentação: planejamento × implementação
 
@@ -242,12 +277,17 @@ A `Documentação Técnica` e o PDF ganham uma seção final com este conteúdo,
 | Apollo Gateway | Hive Gateway com Federation v2 | Apollo Gateway não oferece subscriptions federadas |
 | Prisma em todo o backend | Prisma nos serviços e `pg` no relay e no simulador | Controle de `SKIP LOCKED` e operações condicionais |
 | Sem definição de mapa e nuvem | MapLibre, MapTiler, ECS Fargate, RDS, ElastiCache, CloudFront, Terraform | Definidos durante a implementação |
-| Redis com persistência em disco | Réplica com failover + Outbox com confirmação | Durabilidade garantida de ponta a ponta |
+| Redis com persistência em disco | Outbox com confirmação; réplica opcional na mesma zona | Durabilidade garantida pela aplicação, independentemente do Redis |
+| Alta disponibilidade sem definição de zona | Single-AZ com réplicas de tarefa e recuperação automática | Custo de projeto acadêmico; falha de zona documentada como limitação |
+| Ambiente permanente | Ciclo subir/destruir para demonstração, com domínio estável | Orçamento de US$ 20/mês |
+| Load balancers entre réplicas | ALB externo + ECS Service Connect interno | Mesmo efeito sem custo de um ALB interno |
+| `api.sdv.exemplo.com` | `api.sdv.joaoarthur.com` e `staging.api.sdv.joaoarthur.com` | Domínio próprio, zona delegada ao Route 53 |
 | GitHub Secrets / Docker Secrets | OIDC + Secrets Manager | Sem credencial de longa duração |
 | PgBouncer | Pool nativo com limites calculados | Opção prevista na documentação |
 
 ## 7. Fora de escopo
 
+- Failover entre zonas de disponibilidade (D1).
 - Trânsito em tempo real e otimização global de atribuição.
 - App para motoristas.
 - `terraform apply` ou qualquer deploy pago sem autorização explícita.
