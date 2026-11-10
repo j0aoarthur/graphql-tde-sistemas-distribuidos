@@ -3,5 +3,5 @@ availability_zone= "us-east-1a"
 project          = "sdv"
 deploy_services  = false
 image_tag        = "SET_TO_EXISTING_ECR_IMAGE_SHA"
-monthly_budget_usd = 60
+monthly_budget_usd = 20
 alert_email      = ""
