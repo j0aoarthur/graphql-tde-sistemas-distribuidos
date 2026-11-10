@@ -4,6 +4,7 @@ resource "aws_ecr_repository" "services" {
   for_each             = toset(["gateway", "ocorrencias", "viaturas", "worker", "simulador", "osrm"])
   name                 = "${var.project}/${each.key}"
   image_tag_mutability = "IMMUTABLE"
+  force_delete         = true # permite terraform destroy com imagens publicadas (ciclo subir/destruir da demo)
   image_scanning_configuration {
 
     scan_on_push = true

@@ -1,7 +1,7 @@
 resource "aws_s3_bucket" "frontend" {
 
   bucket_prefix = "${var.project}-ui-"
-  force_destroy = false
+  force_destroy = true # bucket só guarda build estático reproduzível; sem isso o destroy trava com arquivos
 
 }
 resource "aws_s3_bucket_public_access_block" "frontend" {

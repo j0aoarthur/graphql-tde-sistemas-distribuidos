@@ -56,7 +56,7 @@ resource "aws_secretsmanager_secret" "runtime" {
 
   name                    = "${var.project}/runtime"
   description             = "JSON com JWT_SECRET, INTERNAL_SERVICE_TOKEN, OCC_DATABASE_URL, VIATURAS_DATABASE_URL e REDIS_URL; preencher manualmente apos Terraform."
-  recovery_window_in_days = 7
+  recovery_window_in_days = 0 # exclusão imediata; com 7 dias, recriar sdv/runtime logo após destroy falha
 
 }
 resource "aws_service_discovery_private_dns_namespace" "internal" {
