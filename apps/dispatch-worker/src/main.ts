@@ -2,7 +2,11 @@
 import Redis from 'ioredis';
 import { Pool } from 'pg';
 import { randomUUID } from 'node:crypto';
+import { TRACE_CHANNEL, makeTrace, traceEnabled } from '@sdv/shared/trace';
 const STREAM=process.env.NODE_ENV==='test'&&process.env.SDV_TEST_STREAM?process.env.SDV_TEST_STREAM:'sdv:ocorrencias', GROUP='sdv:dispatch', CONSUMER=`worker-${randomUUID()}`;
+// Rótulo curto do worker (W1, W2…) usado no rastro da Arena; ex.: SDV_WORKER_NAME=W2 npm run dev:worker
+const WORKER_LABEL=(process.env.SDV_WORKER_NAME??CONSUMER.slice(7,11)).replace(/[^\w-]/g,'').slice(0,16)||'W?';
+const TRACING=traceEnabled();
 const redis=new Redis(process.env.REDIS_URL??'redis://localhost:6379',{maxRetriesPerRequest:null});
 // Blocking reads must not delay Outbox publication, ACKs or reconciliation.
 const reader=redis.duplicate();
@@ -11,6 +15,10 @@ const fleetPool=new Pool({connectionString:process.env.VIATURAS_DATABASE_URL,max
 let running=true;
 const sleep=(ms:number)=>new Promise(r=>setTimeout(r,ms));
 async function emit(tipo:string,entidadeId:string){await redis.publish('sdv:updates',JSON.stringify({tipo,entidadeId,timestamp:new Date().toISOString()}));}
+function trace(ocorrenciaId:string,passo:'WORKER_RECEBEU',detalhe:string){
+  if(!TRACING)return;
+  try{void redis.publish(TRACE_CHANNEL,JSON.stringify(makeTrace({ocorrenciaId,passo,worker:WORKER_LABEL,detalhe}))).catch(()=>undefined);}catch{/* best-effort */}
+}
 async function publishOutbox() {
   const client=await pool.connect(); let rows:any[]=[];
   try {
@@ -72,13 +80,16 @@ async function close(ocorrenciaId:string,acao:'CANCELADO'|'CONCLUIDO'){
   await fleetAction('/finish',{ocorrenciaId,acao});
   await pool.query(`UPDATE "Ocorrencia" SET versao=versao+1,status=$2,"atualizadoEm"=now() WHERE id=$1 AND status IN ('CANCELAMENTO_PENDENTE','ENCERRAMENTO_PENDENTE')`,[ocorrenciaId,acao==='CANCELADO'?'CANCELADA':'ENCERRADA']);
   await emit('OCORRENCIA',ocorrenciaId);
+  // A viatura acabou de ser liberada: quem está na fila não precisa esperar o ciclo de 15 s.
+  await drainQueue().catch(e=>console.error('Drenagem da fila',e));
 }
-async function dispatch(ocorrenciaId:string,latitude:number,longitude:number){
+async function dispatch(ocorrenciaId:string,latitude:number,longitude:number,origem:'STREAM'|'FILA'='STREAM'){
   const {rows}=await pool.query(`SELECT status FROM "Ocorrencia" WHERE id=$1`,[ocorrenciaId]);
   if(!rows.length)throw Error('Ocorrência desconhecida');
   const status=rows[0].status as string;
   if(['ENCERRADA','CANCELADA','ENCERRAMENTO_PENDENTE','CANCELAMENTO_PENDENTE','EM_ATENDIMENTO'].includes(status))return;
-  const result=await fleetAction('/dispatch',{ocorrenciaId,latitude,longitude});
+  trace(ocorrenciaId,'WORKER_RECEBEU',origem);
+  const result=await fleetAction('/dispatch',{ocorrenciaId,latitude,longitude,worker:WORKER_LABEL});
   if(process.env.NODE_ENV==='test'&&process.env.SDV_TEST_CRASH==='AFTER_FLEET_COMMIT'&&result.status==='DESPACHADA')process.exit(86);
   if(result.status==='DESPACHADA' && result.viaturaId){
     const updated=await pool.query(`UPDATE "Ocorrencia" SET versao=versao+1,status='DESPACHADA',"viaturaId"=$2,"atualizadoEm"=now() WHERE id=$1 AND status IN ('RECEBIDA','AGUARDANDO_VIATURA') RETURNING id`,[ocorrenciaId,result.viaturaId]);
@@ -103,8 +114,12 @@ async function processMessage(messageId:string,fields:string[]) {
 async function retryWaiting(){
   const pending=await pool.query(`SELECT id,status FROM "Ocorrencia" WHERE status IN ('CANCELAMENTO_PENDENTE','ENCERRAMENTO_PENDENTE') ORDER BY "criadoEm" LIMIT 15`);
   for(const oc of pending.rows){try{await close(oc.id,oc.status==='CANCELAMENTO_PENDENTE'?'CANCELADO':'CONCLUIDO');}catch(e){console.error('Retry fechamento',oc.id,e);}}
-  const {rows}=await pool.query(`SELECT id,latitude,longitude FROM "Ocorrencia" WHERE status IN ('RECEBIDA','AGUARDANDO_VIATURA') ORDER BY prioridade DESC,"criadoEm" LIMIT 15`);
-  for(const oc of rows){try{await dispatch(oc.id,oc.latitude,oc.longitude);}catch(e){console.error('Retry fila',oc.id,e);}}
+  await drainQueue();
+}
+/** Redespacha chamados em espera: prioridade maior primeiro, depois o mais antigo. Idempotente (at-least-once). */
+async function drainQueue(){
+  const {rows}=await pool.query(`SELECT id,latitude,longitude FROM "Ocorrencia" WHERE status IN ('RECEBIDA','AGUARDANDO_VIATURA') ORDER BY prioridade DESC,"criadoEm",id LIMIT 15`);
+  for(const oc of rows){try{await dispatch(oc.id,oc.latitude,oc.longitude,'FILA');}catch(e){console.error('Retry fila',oc.id,e);}}
 }
 async function consume(){
   try {await redis.xgroup('CREATE',STREAM,GROUP,'0','MKSTREAM');}catch(e:any){if(!String(e.message).includes('BUSYGROUP')) throw e;}

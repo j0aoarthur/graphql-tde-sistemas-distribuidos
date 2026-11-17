@@ -1,0 +1,12 @@
+export const TRACE_CHANNEL:'sdv:trace';
+export type TracePasso='WORKER_RECEBEU'|'ALOCACAO_INICIADA'|'LOCK_OCUPADO'|'CAS_PERDEU'|'INDICE_RECUSOU'|'VENCEU'|'JA_DESPACHADA'|'SEM_VIATURA';
+export type TraceCamada='STREAM'|'FROTA'|'REDIS'|'POSTGRES'|'INDICE'|'IDEMPOTENCIA'|'FILA';
+export interface TraceEvent{ocorrenciaId:string;passo:TracePasso;camada:TraceCamada;ts:string;worker?:string;viaturaCodigo?:number;detalhe?:string;ms?:number}
+export interface TraceInput{ocorrenciaId:string;passo:TracePasso;worker?:string;viaturaCodigo?:number;detalhe?:string;ms?:number}
+export interface TraceCall{ocorrenciaId:string;status:'EM_DISPUTA'|'EM_ESPERA'|'DESPACHADA';workers:string[];passos:TraceEvent[];bloqueios:{lock:number;cas:number;indice:number};viaturaCodigo:number|null;iniciouEm:string;terminouEm:string|null;duracaoMs:number|null;esperaMs:number;tentativaEm:string}
+export interface TraceSummary{chamados:number;despachados:number;emEspera:number;emDisputa:number;bloqueios:{lock:number;cas:number;indice:number};viaturasDistintas:number;viaturasRepetidas:number;p50Ms:number|null;p95Ms:number|null}
+export const PASSOS:Record<TracePasso,TraceCamada>;
+export function traceEnabled(env?:Record<string,string|undefined>):boolean;
+export function makeTrace(input:TraceInput,now?:number):TraceEvent;
+export function foldTrace(events:TraceEvent[]):TraceCall[];
+export function summarizeTrace(calls:TraceCall[]):TraceSummary;

@@ -13,6 +13,7 @@
     "@nestjs/graphql": "^12.2.2",
     "@nestjs/platform-express": "^10.4.15",
     "@apollo/gateway": "^2.11.1",
+    "@sdv/shared": "0.1.0",
     "@apollo/server": "^4.12.2",
     "graphql": "^16.10.0",
     "reflect-metadata": "^0.2.2",

@@ -8,6 +8,7 @@ import { makeExecutableSchema } from '@graphql-tools/schema';
 import { WebSocketServer } from 'ws';
 import { useServer } from 'graphql-ws/lib/use/ws';
 import Redis from 'ioredis';
+import { TRACE_CHANNEL, traceEnabled } from '@sdv/shared/trace';
 import * as jwt from 'jsonwebtoken';
 @Controller('health') class HealthController{@Get() ok(){return {status:'ok',service:'gateway'};}}
 @Module({imports:[GraphQLModule.forRoot<ApolloGatewayDriverConfig>({
@@ -25,19 +26,26 @@ import * as jwt from 'jsonwebtoken';
 })],controllers:[HealthController]})
 class AppModule {}
 /** Redis Pub/Sub is transient; clients always re-fetch GraphQL state after reconnect. */
-function events():AsyncIterable<{eventoSDV:{tipo:string;entidadeId:string;timestamp:string}}>{
+function redisChannel<T>(channel:string):AsyncIterable<T>{
   return {async *[Symbol.asyncIterator](){
     const subscriber=new Redis(process.env.REDIS_URL??'redis://localhost:6379');
-    const queue:Array<{tipo:string;entidadeId:string;timestamp:string}>=[];
+    const queue:T[]=[];
     let wake:(()=>void)|null=null;
     subscriber.on('message',(_channel,msg)=>{try{queue.push(JSON.parse(msg));wake?.();wake=null;}catch{}});
-    try{await subscriber.subscribe('sdv:updates');while(true){if(!queue.length)await new Promise<void>(resolve=>wake=resolve);while(queue.length)yield {eventoSDV:queue.shift()!};}}
+    try{await subscriber.subscribe(channel);while(true){if(!queue.length)await new Promise<void>(resolve=>wake=resolve);while(queue.length)yield queue.shift()!;}}
     finally{subscriber.disconnect();}
   }};
 }
+type SDVEvent={tipo:string;entidadeId:string;timestamp:string};
+const events=()=>({[Symbol.asyncIterator]:async function*(){for await(const e of redisChannel<SDVEvent>('sdv:updates'))yield {eventoSDV:e};}});
+/** Rastro de decisão da Arena de concorrência: só existe com SDV_DEMO_TRACE=1 (demonstração; nunca em produção). */
+const traces=()=>({[Symbol.asyncIterator]:async function*(){
+  if(!traceEnabled())throw new Error('Rastro de concorrência desativado (defina SDV_DEMO_TRACE=1 no ambiente de demonstração).');
+  for await(const e of redisChannel<unknown>(TRACE_CHANNEL))yield {traceDespacho:e};
+}});
 const schema=makeExecutableSchema({
-  typeDefs:`type Query { ping: String! } type SDVEvento {tipo:String! entidadeId:ID! timestamp:String!} type Subscription {eventoSDV: SDVEvento!}`,
-  resolvers:{Query:{ping:()=>'pong'},Subscription:{eventoSDV:{subscribe:()=>events()}}},
+  typeDefs:`type Query { ping: String! } type SDVEvento {tipo:String! entidadeId:ID! timestamp:String!} type SDVTrace {ocorrenciaId:ID! passo:String! camada:String! ts:String! worker:String viaturaCodigo:Int detalhe:String ms:Int} type Subscription {eventoSDV: SDVEvento! traceDespacho: SDVTrace!}`,
+  resolvers:{Query:{ping:()=>'pong'},Subscription:{eventoSDV:{subscribe:()=>events()},traceDespacho:{subscribe:()=>traces()}}},
 });
 async function bootstrap(){
   const app=await NestFactory.create(AppModule);

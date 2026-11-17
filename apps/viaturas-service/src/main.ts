@@ -1,6 +1,6 @@
 import 'reflect-metadata';
 import { forecast,dayRange } from './estimates';
-import { Module, Injectable, OnModuleInit, OnModuleDestroy, Controller, Post, Body, Headers, UnauthorizedException, BadRequestException, ConflictException } from '@nestjs/common';
+import { Module, Injectable, OnModuleInit, OnModuleDestroy, Controller, Post, Body, Headers, UnauthorizedException, BadRequestException, ConflictException, ForbiddenException } from '@nestjs/common';
 import { NestFactory } from '@nestjs/core';
 import { GraphQLModule, Resolver, Query, Mutation, Args, Context, ResolveReference, ResolveField, Parent } from '@nestjs/graphql';
 import { ApolloFederationDriver, ApolloFederationDriverConfig } from '@nestjs/apollo';
@@ -9,6 +9,7 @@ import Redis from 'ioredis';
 import * as jwt from 'jsonwebtoken';
 import { rankViaturas } from '@sdv/shared';
 import { isValidPlate, normalizePlate } from '@sdv/shared/plate';
+import { TRACE_CHANNEL, makeTrace, traceEnabled, type TraceInput } from '@sdv/shared/trace';
 import { randomUUID } from 'node:crypto';
 import { join } from 'node:path';
 
@@ -22,6 +23,7 @@ function requireAdmin(ctx:any){
   try {const claims=jwt.verify(token,process.env.JWT_SECRET!,{algorithms:['HS256']}) as jwt.JwtPayload;if(claims.papel!=='ADMIN') throw Error('invalid');}
   catch {throw new UnauthorizedException('Token inválido');}
 }
+const ARENA_LOCK_OFF='sdv:arena:lock-off';
 const validLatLon=(a:number,b:number)=>Number.isFinite(a)&&Number.isFinite(b)&&Math.abs(a)<=90&&Math.abs(b)<=180;
 @Injectable()
 class DispatchService implements OnModuleDestroy {
@@ -42,33 +44,44 @@ class DispatchService implements OnModuleDestroy {
     await this.emit('SIMULACAO','global');return this.getSimulation();
   }
   async emit(tipo:string,entidadeId:string){await this.redis.publish('sdv:updates',JSON.stringify({tipo,entidadeId,timestamp:new Date().toISOString()})).catch(()=>undefined);}
-  async alocar(input: {ocorrenciaId:string;latitude:number;longitude:number}) {
+  /** Rastro da decisão para a Arena de concorrência. Desligado por padrão; nunca altera nem atrasa o fluxo. */
+  private readonly tracing=traceEnabled();
+  private trace(p:TraceInput,t0:number){
+    if(!this.tracing)return;
+    try{void this.redis.publish(TRACE_CHANNEL,JSON.stringify(makeTrace({...p,ms:Date.now()-t0}))).catch(()=>undefined);}catch{/* rastro é best-effort */}
+  }
+  async alocar(input: {ocorrenciaId:string;latitude:number;longitude:number;worker?:string}) {
+    const t0=Date.now(),worker=typeof input.worker==='string'?input.worker:undefined;
     if (!/^[0-9a-f-]{36}$/i.test(input.ocorrenciaId)||!validLatLon(input.latitude,input.longitude)) throw new BadRequestException('Dados inválidos');
     const anterior=await this.db.despacho.findUnique({where:{ocorrenciaId:input.ocorrenciaId}});
-    if(anterior) return {status:anterior.status==='CANCELADO'?'CANCELADO':'DESPACHADA',viaturaId:anterior.viaturaId,despachoId:anterior.id};
+    if(anterior){this.trace({ocorrenciaId:input.ocorrenciaId,passo:'JA_DESPACHADA',worker},t0);return {status:anterior.status==='CANCELADO'?'CANCELADO':'DESPACHADA',viaturaId:anterior.viaturaId,despachoId:anterior.id};}
     const livres=await this.db.viatura.findMany({where:{status:'DISPONIVEL',ultimoSinalEm:{gte:new Date(Date.now()-30000)},turnos:{some:{fimEm:null}}}});
+    const lockOff=process.env.SDV_DEMO_MODE==='1'&&await this.redis.get(ARENA_LOCK_OFF).catch(()=>null)==='1';
     const candidatas=rankViaturas(livres,{latitude:input.latitude,longitude:input.longitude});
+    this.trace({ocorrenciaId:input.ocorrenciaId,passo:'ALOCACAO_INICIADA',worker,detalhe:`${candidatas.length} livres`},t0);
     for(const viatura of candidatas) {
       const key=`sdv:lock:viatura:${viatura.id}`;
       const token=randomUUID();
-      const obtained=await this.redis.set(key,token,'PX',10000,'NX');
-      if(obtained!=='OK') continue;
+      // Somente na demo (SDV_DEMO_MODE=1): a Arena pode desligar o lock do Redis para provar que o PostgreSQL sozinho impede a duplicidade.
+      const obtained=lockOff?'OK':await this.redis.set(key,token,'PX',10000,'NX');
+      if(obtained!=='OK'){this.trace({ocorrenciaId:input.ocorrenciaId,passo:'LOCK_OCUPADO',worker,viaturaCodigo:viatura.codigo},t0);continue;}
       try {
         const result=await this.db.$transaction(async tx=>{
           const existing=await tx.despacho.findUnique({where:{ocorrenciaId:input.ocorrenciaId}});
           if(existing) return {status:'DESPACHADA',viaturaId:existing.viaturaId,despachoId:existing.id};
           const updated=await tx.viatura.updateMany({where:{id:viatura.id,status:'DISPONIVEL'},data:{status:'OCUPADA',versao:{increment:1}}});
-          if(updated.count!==1) return null;
+          if(updated.count!==1){this.trace({ocorrenciaId:input.ocorrenciaId,passo:'CAS_PERDEU',worker,viaturaCodigo:viatura.codigo},t0);return null;}
           await tx.patrulha.updateMany({where:{viaturaId:viatura.id,status:'ATIVA'},data:{status:'SUSPENSA'}});
           const despacho=await tx.despacho.create({data:{ocorrenciaId:input.ocorrenciaId,viaturaId:viatura.id,status:'CONFIRMADO',destinoLat:input.latitude,destinoLon:input.longitude}});
           await tx.outbox.create({data:{tipo:'DESPACHO_CONFIRMADO',payload:{despachoId:despacho.id,ocorrenciaId:input.ocorrenciaId,viaturaId:viatura.id}}});
           return {status:'DESPACHADA',viaturaId:viatura.id,despachoId:despacho.id};
         });
-        if(result){await this.emit('DESPACHO',input.ocorrenciaId);return result;}
+        if(result){if(result.viaturaId===viatura.id)this.trace({ocorrenciaId:input.ocorrenciaId,passo:'VENCEU',worker,viaturaCodigo:viatura.codigo},t0);else this.trace({ocorrenciaId:input.ocorrenciaId,passo:'JA_DESPACHADA',worker},t0);await this.emit('DESPACHO',input.ocorrenciaId);return result;}
       } catch(err) {
         if(err instanceof Prisma.PrismaClientKnownRequestError && err.code==='P2002') {
           const current=await this.db.despacho.findUnique({where:{ocorrenciaId:input.ocorrenciaId}});
-          if(current) return {status:'DESPACHADA',viaturaId:current.viaturaId,despachoId:current.id};
+          if(current){this.trace({ocorrenciaId:input.ocorrenciaId,passo:'JA_DESPACHADA',worker},t0);return {status:'DESPACHADA',viaturaId:current.viaturaId,despachoId:current.id};}
+          this.trace({ocorrenciaId:input.ocorrenciaId,passo:'INDICE_RECUSOU',worker,viaturaCodigo:viatura.codigo},t0);
           continue;
         }
         throw err;
@@ -76,7 +89,43 @@ class DispatchService implements OnModuleDestroy {
     }
     const again=await this.db.despacho.findUnique({where:{ocorrenciaId:input.ocorrenciaId}});
     if(again) return {status:'DESPACHADA',viaturaId:again.viaturaId,despachoId:again.id};
+    this.trace({ocorrenciaId:input.ocorrenciaId,passo:'SEM_VIATURA',worker},t0);
     return {status:'SEM_VIATURA'};
+  }
+  /** ── Arena de concorrência (demonstração) ───────────────────────────────────────────────────────────────
+   * Reserva viaturas para que poucas fiquem livres e a disputa fique visível. Só com SDV_DEMO_MODE=1.
+   * `INDISPONIVEL` não é usado por nenhum outro fluxo: reservar/restaurar é um UPDATE condicional por status,
+   * o simulador só patrulha `DISPONIVEL` (a reservada fica parada) e o despacho só considera `DISPONIVEL`. */
+  assertDemo(){if(process.env.SDV_DEMO_MODE!=='1')throw new ForbiddenException('Modo de demonstração desativado (defina SDV_DEMO_MODE=1 no ambiente de demonstração).');}
+  async estadoArena(){
+    const [reservadas,livres,consumers,lockOff]=await Promise.all([
+      this.db.viatura.count({where:{status:'INDISPONIVEL'}}),
+      this.db.viatura.count({where:{status:'DISPONIVEL',turnos:{some:{fimEm:null}}}}),
+      (this.redis.xinfo('CONSUMERS','sdv:ocorrencias','sdv:dispatch') as Promise<any[]>).catch(()=>[] as any[]),
+      this.redis.get(ARENA_LOCK_OFF).catch(()=>null),
+    ]);
+    // Cada consumer é um array [nome,<n>,'pending',<n>,'idle',<ms>,...]; vivo = interagiu há menos de 10 s.
+    const workers=consumers.filter(c=>{const i=c.indexOf('idle');return i>=0&&Number(c[i+1])<10000;}).length;
+    return {ativa:reservadas>0,livres,reservadas,workers,rastroAtivo:this.tracing,modoDemo:process.env.SDV_DEMO_MODE==='1',lockRedis:lockOff!=='1'};
+  }
+  async prepararArena(livres:number,latitude:number,longitude:number){
+    this.assertDemo();
+    const free=await this.db.viatura.findMany({where:{status:'DISPONIVEL',turnos:{some:{fimEm:null}}}});
+    const keep=new Set(rankViaturas(free,{latitude,longitude}).slice(0,livres).map(v=>v.id));
+    const reserve=free.filter(v=>!keep.has(v.id)).map(v=>v.id);
+    if(reserve.length)await this.db.viatura.updateMany({where:{id:{in:reserve},status:'DISPONIVEL'},data:{status:'INDISPONIVEL',versao:{increment:1}}});
+    await this.emit('VIATURA','arena');return this.estadoArena();
+  }
+  async configurarArena(lockRedis:boolean){
+    this.assertDemo();
+    if(lockRedis)await this.redis.del(ARENA_LOCK_OFF);else await this.redis.set(ARENA_LOCK_OFF,'1','EX',1800);// expira sozinho em 30 min
+    return this.estadoArena();
+  }
+  async restaurarArena(){
+    this.assertDemo();
+    await this.redis.del(ARENA_LOCK_OFF);
+    await this.db.viatura.updateMany({where:{status:'INDISPONIVEL'},data:{status:'DISPONIVEL',versao:{increment:1}}});
+    await this.emit('VIATURA','arena');return this.estadoArena();
   }
   async finalizar(input:{ocorrenciaId:string;acao:'CONCLUIDO'|'CANCELADO'}){
     if(!/^[0-9a-f-]{36}$/i.test(input.ocorrenciaId)||!['CONCLUIDO','CANCELADO'].includes(input.acao))throw new BadRequestException();
@@ -113,6 +162,14 @@ class ViaturaResolver {
     requireAdmin(ctx);if(!Number.isFinite(fator)||fator<1||fator>60)throw new BadRequestException('Fator deve estar entre 1 e 60');
     return this.dispatcher.setSimulation(fator,pausada);
   }
+  @Query('estadoArena') estadoArena(@Context() ctx:any){requireAdmin(ctx);return this.dispatcher.estadoArena();}
+  @Mutation('prepararArena') prepararArena(@Context() ctx:any,@Args('livres') livres:number,@Args('latitude') latitude:number,@Args('longitude') longitude:number){
+    requireAdmin(ctx);this.dispatcher.assertDemo();
+    if(!Number.isInteger(livres)||livres<1||livres>12||!validLatLon(latitude,longitude))throw new BadRequestException('Informe de 1 a 12 viaturas livres e um ponto válido');
+    return this.dispatcher.prepararArena(livres,latitude,longitude);
+  }
+  @Mutation('configurarArena') configurarArena(@Context() ctx:any,@Args('lockRedis') lockRedis:boolean){requireAdmin(ctx);return this.dispatcher.configurarArena(lockRedis);}
+  @Mutation('restaurarArena') restaurarArena(@Context() ctx:any){requireAdmin(ctx);return this.dispatcher.restaurarArena();}
   @Mutation('simularFalhaGps') simularFalhaGps(@Context() ctx:any,@Args('segundos') segundos:number){
     requireAdmin(ctx);if(!Number.isInteger(segundos)||segundos<1||segundos>120)throw new BadRequestException('Intervalo entre 1 e 120s');
     return this.dispatcher.signalLoss(segundos);

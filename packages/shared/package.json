@@ -24,6 +24,10 @@
     "./motion": {
       "types": "./motion.d.ts",
       "default": "./motion.cjs"
+    },
+    "./trace": {
+      "types": "./trace.d.ts",
+      "default": "./trace.cjs"
     }
   }
 }

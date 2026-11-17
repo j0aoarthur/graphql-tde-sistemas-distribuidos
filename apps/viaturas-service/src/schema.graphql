@@ -47,6 +47,7 @@ type Despacho {
   distanciaInicialMetros: Float
   concluidoEm: String
 }
+type EstadoArena { ativa: Boolean! livres: Int! reservadas: Int! workers: Int! rastroAtivo: Boolean! modoDemo: Boolean! lockRedis: Boolean! }
 type EstadoSimulacao { fator: Float! pausada: Boolean! sinalIndisponivel: Boolean! }
 input NovaViaturaInput { placa: String! latitude: Float! longitude: Float! capacidade: Int! }
 type PrevisaoDespacho { calculadoEm:String! viaturaCandidataId:ID distanciaMetros:Float duracaoViariaSegundos:Float origemEstimativa:String! qualidadeEstimativa:String! }
@@ -59,6 +60,7 @@ type Query {
   consultarViatura(id: ID!): Viatura
   listarDespachos: [Despacho!]!
   estadoSimulacao: EstadoSimulacao!
+  estadoArena: EstadoArena!
   consultarDespacho(id: ID!): Despacho
 }
 type Mutation {
@@ -67,4 +69,7 @@ type Mutation {
   pausarSimulacao(despachoId: ID!, pausada: Boolean!): Despacho!
   configurarSimulacao(fator: Float!, pausada: Boolean!): EstadoSimulacao!
   simularFalhaGps(segundos: Int!): EstadoSimulacao!
+  prepararArena(livres: Int!, latitude: Float!, longitude: Float!): EstadoArena!
+  configurarArena(lockRedis: Boolean!): EstadoArena!
+  restaurarArena: EstadoArena!
 }
