@@ -33,7 +33,9 @@ async function replayFleetOutbox(){
   const client=await fleetPool.connect();
   try {
     await client.query('BEGIN');
-    const {rows}=await client.query(`SELECT id,tipo,payload,"criadoEm" FROM "Outbox" WHERE "publicadoEm" IS NULL ORDER BY "criadoEm" LIMIT 20 FOR UPDATE SKIP LOCKED`);
+    // "criadoEm" é `timestamp` sem fuso, gravado em UTC. Sem o AT TIME ZONE, o driver pg o lê como hora local do
+    // processo Node (ex.: UTC-3 em Bahia) e o evento sai deslocado em horas. Retorna timestamptz → instante correto.
+    const {rows}=await client.query(`SELECT id,tipo,payload,"criadoEm" AT TIME ZONE 'UTC' AS "criadoEm" FROM "Outbox" WHERE "publicadoEm" IS NULL ORDER BY "criadoEm" LIMIT 20 FOR UPDATE SKIP LOCKED`);
     for(const row of rows){
       const p=row.payload;
       const labels:Record<string,string>={DESPACHO_CONFIRMADO:'Despacho confirmado',VIATURA_CHEGOU:'Viatura chegou ao local',ROTA_CALCULADA:'Rota calculada',DESLOCAMENTO_INICIADO:'Deslocamento iniciado',SINAL_PERDIDO:'Sinal de GPS perdido',SINAL_RESTABELECIDO:'Sinal de GPS restabelecido'};
