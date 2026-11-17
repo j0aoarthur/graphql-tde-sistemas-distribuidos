@@ -2,6 +2,7 @@ import {accessToken,refreshSession,sessionToken} from './session';
 import {createClient} from 'graphql-ws';
 import {reconcileList} from '@sdv/shared/state';
 import type {Snapshot} from './types';
+import type {TraceEvent} from '@sdv/shared/trace';
 const API=import.meta.env.VITE_GRAPHQL_URL||'/graphql';
 const WS=import.meta.env.VITE_GRAPHQL_WS_URL||`${location.protocol==='https:'?'wss':'ws'}://${location.host}/subscriptions`;
 export const VEHICLE_FIELDS=`id codigo placa status latitude longitude capacidade versao atualizadoEm ultimoSinalEm ultimaPosicaoEm ultimoMovimentoEm direcaoGraus versaoPosicao patrulhaRota patrulhaProgresso operandoDesde`;
@@ -28,6 +29,15 @@ export function watchUpdates(token:string,onUpdate:(event?:{tipo:string;entidade
   const unsubscribe=client.subscribe<{eventoSDV:{tipo:string;entidadeId:string}} >({query:'subscription {eventoSDV{tipo entidadeId timestamp}}'}, {
     next:(data)=>{onStatus(true);onUpdate(data.data?.eventoSDV);},
     error:()=>onStatus(false),complete:()=>onStatus(false),
+  });
+  return ()=>{unsubscribe();void client.dispose();};
+}
+/** Rastro de decisão da Arena (só existe com SDV_DEMO_TRACE=1 no backend). 'disabled' = backend sem a flag. */
+export function watchTrace(onEvent:(e:TraceEvent)=>void,onStatus:(s:'connected'|'off'|'disabled')=>void){
+  const client=createClient({url:WS,connectionParams:async()=>({authorization:`Bearer ${await sessionToken()}`}),lazy:true,retryAttempts:Infinity,shouldRetry:()=>true,on:{connected:()=>onStatus('connected'),closed:()=>onStatus('off')}});
+  const unsubscribe=client.subscribe<{traceDespacho:TraceEvent}>({query:'subscription {traceDespacho{ocorrenciaId passo camada ts worker viaturaCodigo detalhe ms}}'},{
+    next:(data)=>{onStatus('connected');if(data.data?.traceDespacho)onEvent(data.data.traceDespacho);},
+    error:(e)=>onStatus(Array.isArray(e)&&e.some((x:{message?:string})=>/desativado/i.test(x.message??''))?'disabled':'off'),complete:()=>onStatus('off'),
   });
   return ()=>{unsubscribe();void client.dispose();};
 }

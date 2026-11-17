@@ -1,4 +1,4 @@
-export type View = 'overview'|'map'|'incidents'|'fleet'|'history'|'simulation';
+export type View = 'overview'|'map'|'incidents'|'fleet'|'history'|'simulation'|'arena';
 export type EntitySelection = {kind:'incident'|'vehicle'|'dispatch';id:string}|null;
 export type LatLon=[number,number];
 export type Admin={id:string;nome:string;email:string;centralId:string;papel:string};

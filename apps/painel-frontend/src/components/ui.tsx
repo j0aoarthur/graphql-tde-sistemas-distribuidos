@@ -6,7 +6,7 @@ import {vehiclePlate,vehicleRef} from '../lib/vehicle';
 import type {Vehicle} from '../types';
 export type Tone='green'|'red'|'amber'|'blue'|'neutral';
 export const STATUS:Record<string,{label:string;tone:Tone}>={
- DISPONIVEL:{label:'Disponível',tone:'green'},OCUPADA:{label:'Em deslocamento',tone:'red'},NO_LOCAL:{label:'No local',tone:'blue'},
+ DISPONIVEL:{label:'Disponível',tone:'green'},OCUPADA:{label:'Em deslocamento',tone:'red'},NO_LOCAL:{label:'No local',tone:'blue'},INDISPONIVEL:{label:'Reservada (demo)',tone:'neutral'},
  RECEBIDA:{label:'Recebida',tone:'amber'},AGUARDANDO_VIATURA:{label:'Aguardando viatura',tone:'amber'},
  DESPACHADA:{label:'Despachada',tone:'red'},EM_ATENDIMENTO:{label:'Em atendimento',tone:'blue'},
  ENCERRADA:{label:'Encerrada',tone:'green'},CANCELADA:{label:'Cancelada',tone:'neutral'},
