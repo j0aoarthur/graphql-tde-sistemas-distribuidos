@@ -4,8 +4,8 @@ test('ciclo completo na interface preserva chegada após F5 e retoma patrulha',a
  test.setTimeout(60000);
  await page.route('https://api.maptiler.com/maps/**',r=>r.fulfill({json:{version:8,sources:{},layers:[{id:'bg',type:'background',paint:{'background-color':'#edf1f5'}}]}}));
  await page.route('https://api.maptiler.com/geocoding/**',r=>r.fulfill({json:{features:[{center:[-38.97,-12.26],place_name:'Rua de teste, Feira de Santana, Bahia'}]}}));
- const auth=await request.post('http://127.0.0.1:4000/graphql',{data:{query:'mutation($s:String!){login(email:"central-a@sdv.local",senha:$s){accessToken}}',variables:{s:process.env.DEMO_ADMIN_PASSWORD}}});const token=(await auth.json()).data.login.accessToken;
- async function gql(query:string,variables:Record<string,unknown>={}){const r=await request.post('http://127.0.0.1:4000/graphql',{headers:{authorization:'Bearer '+token},data:{query,variables}});const b=await r.json();expect(b.errors).toBeUndefined();return b.data;}
+ const auth=await request.post((process.env.SDV_API??'http://127.0.0.1:4000/graphql'),{data:{query:'mutation($s:String!){login(email:"central-a@sdv.local",senha:$s){accessToken}}',variables:{s:process.env.DEMO_ADMIN_PASSWORD}}});const token=(await auth.json()).data.login.accessToken;
+ async function gql(query:string,variables:Record<string,unknown>={}){const r=await request.post((process.env.SDV_API??'http://127.0.0.1:4000/graphql'),{headers:{authorization:'Bearer '+token},data:{query,variables}});const b=await r.json();expect(b.errors).toBeUndefined();return b.data;}
  await gql('mutation{configurarSimulacao(fator:60,pausada:false){fator}}');
  const createdIds:string[]=[];try{
   await page.goto('http://localhost:5173');await page.getByLabel('Senha de acesso').fill(process.env.DEMO_ADMIN_PASSWORD!);await page.getByRole('button',{name:'Acessar central'}).click();
@@ -17,7 +17,7 @@ test('ciclo completo na interface preserva chegada após F5 e retoma patrulha',a
   const creation=page.waitForResponse(r=>r.url().endsWith('/graphql')&&!!r.request().postData()?.includes('abrirOcorrencia'));
   await page.getByRole('button',{name:'Registrar ocorrência',exact:true}).click();const created=(await (await creation).json()).data.abrirOcorrencia;createdIds.push(created.id);
   await page.locator('.operation-row').filter({hasText:title}).click();await expect(page.locator('.timeline')).toContainText('Viatura chegou ao local',{timeout:18000});
-  await expect(page.locator('.arrival-info').first()).toContainText(/\d+ min \d{2} s/);await expect(page.locator('.arrival-info').first()).toContainText(/previsão inicial/);
+  await expect(page.locator('.arrival-info').first()).toContainText(/Chegada registrada · \d+ (?:s|min(?: \d{2} s)?|h(?: \d{1,2} min)?|d(?: \d{1,2} h)?) em deslocamento/);await expect(page.locator('.arrival-info').first()).toContainText(/previsão inicial/);
   const arrival=page.locator('.timeline>div').filter({hasText:'Viatura chegou ao local'}).locator('small').first();const originalTime=await arrival.innerText();
   await page.reload();await page.locator('.operation-row').filter({hasText:title}).click();await expect(page.locator('.timeline>div').filter({hasText:'Viatura chegou ao local'}).locator('small').first()).toHaveText(originalTime);
   const data=await gql('query($id:ID!){consultarOcorrencia(id:$id){viaturaId}}',{id:created.id});const vehicleId=data.consultarOcorrencia.viaturaId;

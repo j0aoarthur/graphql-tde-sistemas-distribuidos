@@ -7,6 +7,7 @@ import {interpolateSamples,remainingRoute,TELEMETRY_BUFFER_MS,type MotionSample}
 import {PRIORITIES,PRIORITY_PIN} from '../lib/presentation';
 import {useCurrentTheme} from '../lib/theme';
 import {vehicleActivity,vehicleRef} from '../lib/vehicle';
+import {formatClock} from '../lib/time';
 import {Info,MapPin} from 'lucide-react';
 import workerUrl from 'maplibre-gl/dist/maplibre-gl-worker.mjs?url';
 maplibregl.setWorkerUrl(workerUrl);
@@ -74,7 +75,7 @@ export function OperationsMap({vehicles,incidents,dispatches,selectedId,onSelect
    const stale=signal(v)!=='Sinal OK',color=stale||v.status==='INDISPONIVEL'?'#64748b':v.status==='DISPONIVEL'?'#08735a':v.status==='NO_LOCAL'?'#69419c':'#235fa4';
    let entry=old;
    if(!entry){const el=document.createElement('button');el.type='button';el.className='vehicle-marker';el.onclick=e=>{e.stopPropagation();callbacks.current.onSelect?.('vehicle',v.id);};entry={marker:new maplibregl.Marker({element:el,rotationAlignment:'map'}).setLngLat([v.longitude,v.latitude]).addTo(m),progress:0,route:null,frame:0,version:v.versao,samples:[],positionVersion:-1,displayProgress:0};markers.current.set(v.id,entry);}
-   const el=entry.marker.getElement();el.innerHTML=car(color);el.title=`${vehicleRef(v)} · ${vehicleActivity(v.status)} · ${signal(v)}`;el.setAttribute('aria-label',el.title);el.style.visibility=m.getZoom()<11?'hidden':'visible';el.dataset.status=v.status;el.dataset.signal=signal(v);el.classList.toggle('selected',selectedId===v.id);
+   const el=entry.marker.getElement();el.innerHTML=car(color);el.title=`${vehicleRef(v)} · ${vehicleActivity(v.status)} · ${signal(v)} · Último sinal: ${v.ultimoSinalEm?formatClock(v.ultimoSinalEm):'não recebido'}`;el.setAttribute('aria-label',el.title);el.style.visibility=m.getZoom()<11?'hidden':'visible';el.dataset.status=v.status;el.dataset.signal=signal(v);el.classList.toggle('selected',selectedId===v.id);
    const d=dispatches.find(x=>x.viaturaId===v.id&&!['CONCLUIDO','CANCELADO'].includes(x.status));const raw=d?.rota??v.patrulhaRota??null,points=geometry(raw),target=d?.progresso??v.patrulhaProgresso??0;
    const positionVersion=v.versaoPosicao??v.versao;
    const stop=stale||v.status==='NO_LOCAL'||matchMedia('(prefers-reduced-motion: reduce)').matches;
