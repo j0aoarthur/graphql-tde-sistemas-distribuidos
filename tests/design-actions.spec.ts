@@ -73,8 +73,8 @@ test('cadastro de viatura: mapa, capacidade, validação e persistência',async(
 
 test('laboratório: pausar, retomar, ajustar velocidade por teclado e restaurar 1×',async({page,request})=>{
  await setup(page);await navigate(page,/^Laboratório$/);
- const auth=await request.post('http://127.0.0.1:4000/graphql',{data:{query:'mutation($s:String!){login(email:"central-a@sdv.local",senha:$s){accessToken}}',variables:{s:process.env.DEMO_ADMIN_PASSWORD}}});const token=(await auth.json()).data.login.accessToken;
- const call=async(query:string)=>{const response=await request.post('http://127.0.0.1:4000/graphql',{headers:{authorization:`Bearer ${token}`},data:{query}});const body=await response.json();expect(body.errors).toBeUndefined();return body.data;};
+ const auth=await request.post((process.env.SDV_API??'http://127.0.0.1:4000/graphql'),{data:{query:'mutation($s:String!){login(email:"central-a@sdv.local",senha:$s){accessToken}}',variables:{s:process.env.DEMO_ADMIN_PASSWORD}}});const token=(await auth.json()).data.login.accessToken;
+ const call=async(query:string)=>{const response=await request.post((process.env.SDV_API??'http://127.0.0.1:4000/graphql'),{headers:{authorization:`Bearer ${token}`},data:{query}});const body=await response.json();expect(body.errors).toBeUndefined();return body.data;};
  try{
   await page.getByRole('button',{name:'Pausar simulação',exact:true}).click();await expect(page.getByRole('button',{name:'Retomar simulação',exact:true})).toBeVisible();expect((await call('query{estadoSimulacao{pausada}}')).estadoSimulacao.pausada).toBe(true);
   await page.getByRole('button',{name:'Retomar simulação',exact:true}).click();await expect(page.getByRole('button',{name:'Pausar simulação',exact:true})).toBeVisible();await page.getByRole('button',{name:'Restaurar velocidade real (1×)',exact:true}).click();const slider=page.getByLabel('Velocidade de simulação');await expect(slider).toHaveValue('1');await slider.focus();await slider.press('ArrowRight');await expect.poll(async()=>(await call('query{estadoSimulacao{fator}}')).estadoSimulacao.fator).toBe(2);await expect(slider).toHaveValue('2');
