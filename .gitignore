@@ -14,3 +14,4 @@ apps/**/src/generated/
 
 test-results/
 playwright-report/
+.demo-arena/
