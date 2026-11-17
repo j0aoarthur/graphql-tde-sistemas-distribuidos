@@ -3,7 +3,7 @@ import { PrismaClient as OccPrisma } from '../apps/ocorrencias-service/src/gener
 import { PrismaClient as FleetPrisma } from '../apps/viaturas-service/src/generated/client';
 import * as bcrypt from 'bcryptjs';
 const a=new OccPrisma();const b=new FleetPrisma();
-const coords=[[-12.255,-38.968],[-12.242,-38.955],[-12.273,-38.970],[-12.254,-38.989],[-12.263,-38.950],[-12.283,-38.962],[-12.240,-38.981],[-12.270,-38.941],[-12.251,-38.934],[-12.292,-38.985],[-12.228,-38.968],[-12.277,-39.000]];
+const coords=[[-12.255,-38.968],[-12.242,-38.955],[-12.273,-38.970],[-12.254,-38.989],[-12.263,-38.950],[-12.283,-38.962],[-12.240,-38.981],[-12.270,-38.941],[-12.251,-38.934],[-12.282317,-38.986755],[-12.228,-38.968],[-12.276786,-38.996008]];
 async function run(){
  const password=process.env.DEMO_ADMIN_PASSWORD;
  if(!password||password.length<12) throw Error('Configure DEMO_ADMIN_PASSWORD (>=12 caracteres) em ambiente local');
