@@ -21,7 +21,7 @@ test('ciclo completo na interface preserva chegada após F5 e retoma patrulha',a
   const arrival=page.locator('.timeline>div').filter({hasText:'Viatura chegou ao local'}).locator('small').first();const originalTime=await arrival.innerText();
   await page.reload();await page.locator('.operation-row').filter({hasText:title}).click();await expect(page.locator('.timeline>div').filter({hasText:'Viatura chegou ao local'}).locator('small').first()).toHaveText(originalTime);
   const data=await gql('query($id:ID!){consultarOcorrencia(id:$id){viaturaId}}',{id:created.id});const vehicleId=data.consultarOcorrencia.viaturaId;
-  await page.getByRole('button',{name:'Encerrar atendimento',exact:true}).click();await expect(page.locator('.timeline')).toContainText('Atendimento concluído',{timeout:12000});
+  await page.getByRole('button',{name:'Encerrar atendimento',exact:true}).click();await page.getByRole('dialog',{name:'Encerrar atendimento'}).getByRole('button',{name:'Encerrar atendimento',exact:true}).click();await expect(page.locator('.timeline')).toContainText('Atendimento concluído',{timeout:12000});
   await expect.poll(async()=>{const d=await gql('query($id:ID!){consultarViatura(id:$id){status patrulhaRota versaoPosicao}}',{id:vehicleId});return d.consultarViatura.status;}).toBe('DISPONIVEL');
   const first=await gql('query($id:ID!){consultarViatura(id:$id){versaoPosicao}}',{id:vehicleId});await expect.poll(async()=>{const d=await gql('query($id:ID!){consultarViatura(id:$id){versaoPosicao}}',{id:vehicleId});return d.consultarViatura.versaoPosicao;},{timeout:12000}).toBeGreaterThan(first.consultarViatura.versaoPosicao);
   await page.screenshot({path:'test-results/ciclo-completo-timeline.png'});

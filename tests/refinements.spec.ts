@@ -25,5 +25,5 @@ test('trecho restante, interpolação confirmada e tempos em minutos e segundos'
   const samples=[{...base,time:1000,progress:.1,point:route[0]},{...base,time:2000,progress:.6,point:route[1]}];
   return {remaining:remainingRoute(route,.7),finished:remainingRoute(route,1),sample:interpolateSamples(samples,1500),frozen:interpolateSamples(samples,9000),times:[formatDuration(0),formatDuration(75),formatDuration(3605),formatDuration(null)]};
  });
- expect(result.remaining).toHaveLength(2);expect(result.remaining[0][0]).toBeGreaterThan(-12.26);expect(result.finished).toEqual([]);expect(result.sample.point[0]).toBeCloseTo(-12.26,5);expect(result.sample.progress).toBeCloseTo(.35);expect(result.frozen.progress).toBe(.6);expect(result.times).toEqual(['0 min 00 s','1 min 15 s','60 min 05 s','Indisponível']);
+ expect(result.remaining).toHaveLength(2);expect(result.remaining[0][0]).toBeGreaterThan(-12.26);expect(result.finished).toEqual([]);expect(result.sample.point[0]).toBeCloseTo(-12.26,5);expect(result.sample.progress).toBeCloseTo(.35);expect(result.frozen.progress).toBe(.6);expect(result.times).toEqual(['0 s','1 min 15 s','1 h','Indisponível']);
 });

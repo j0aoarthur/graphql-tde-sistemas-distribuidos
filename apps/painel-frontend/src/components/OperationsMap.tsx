@@ -4,7 +4,9 @@ import type {Map as GLMap,GeoJSONSource} from 'maplibre-gl';
 import type {Dispatch,Incident,LatLon,Vehicle} from '../types';
 import 'maplibre-gl/dist/maplibre-gl.css';
 import {interpolateSamples,remainingRoute,TELEMETRY_BUFFER_MS,type MotionSample} from '../lib/map-motion';
-import {PRIORITIES} from '../lib/presentation';
+import {PRIORITIES,PRIORITY_PIN} from '../lib/presentation';
+import {useCurrentTheme} from '../lib/theme';
+import {vehicleActivity,vehicleRef} from '../lib/vehicle';
 import {Info,MapPin} from 'lucide-react';
 import workerUrl from 'maplibre-gl/dist/maplibre-gl-worker.mjs?url';
 maplibregl.setWorkerUrl(workerUrl);
@@ -25,11 +27,11 @@ export function OperationsMap({vehicles,incidents,dispatches,selectedId,onSelect
  const picker=useRef<maplibregl.Marker|null>(null),styleReady=useRef(false);
  const[following,setFollowing]=useState(false),[age,setAge]=useState(0);
  useEffect(()=>{const timer=setInterval(()=>setAge(n=>n+1),2000);return()=>clearInterval(timer);},[]);
- const[ready,setReady]=useState(0),[dark,setDark]=useState(false),[error,setError]=useState('');
+ const[ready,setReady]=useState(0),[error,setError]=useState('');const dark=useCurrentTheme()==='dark';
  const key=import.meta.env.VITE_MAPTILER_API_KEY;
  useEffect(()=>{
   if(!root.current)return;
-  const style=import.meta.env.VITE_MAP_STYLE_URL||(key?`https://api.maptiler.com/maps/dataviz/style.json?key=${encodeURIComponent(key)}`:{version:8 as const,sources:{},layers:[{id:'background',type:'background' as const,paint:{'background-color':'#edf1f5'}}]});
+  const style=(dark?import.meta.env.VITE_MAP_DARK_STYLE_URL:import.meta.env.VITE_MAP_STYLE_URL)||(key?`https://api.maptiler.com/maps/${dark?'dataviz-dark':'dataviz'}/style.json?key=${encodeURIComponent(key)}`:{version:8 as const,sources:{},layers:[{id:'background',type:'background' as const,paint:{'background-color':dark?'#101a24':'#edf1f5'}}]});
   if(!key&&!import.meta.env.VITE_MAP_STYLE_URL)setError('Mapa base indisponível: configure o acesso MapTiler.');
   const m=new maplibregl.Map({container:root.current,style,center:lnglat(FEIRA),zoom,attributionControl:{compact:true}});map.current=m;
   if(root.current)root.current.dataset.zoom=String(m.getZoom());
@@ -42,7 +44,8 @@ export function OperationsMap({vehicles,incidents,dispatches,selectedId,onSelect
   const resize=new ResizeObserver(()=>m.resize());resize.observe(root.current);
   return()=>{resize.disconnect();markers.current.forEach(x=>cancelAnimationFrame(x.frame));markers.current.clear();picker.current=null;m.remove();map.current=null;};
  },[]);
- useEffect(()=>{const m=map.current;if(!m||!key)return;styleReady.current=false;m.setStyle(dark?(import.meta.env.VITE_MAP_DARK_STYLE_URL||`https://api.maptiler.com/maps/dataviz-dark/style.json?key=${encodeURIComponent(key)}`):(import.meta.env.VITE_MAP_STYLE_URL||`https://api.maptiler.com/maps/dataviz/style.json?key=${encodeURIComponent(key)}`));},[dark]);
+ const styleTheme=useRef(dark);
+ useEffect(()=>{const m=map.current;if(!m||!key||styleTheme.current===dark)return;styleTheme.current=dark;styleReady.current=false;m.setStyle(dark?(import.meta.env.VITE_MAP_DARK_STYLE_URL||`https://api.maptiler.com/maps/dataviz-dark/style.json?key=${encodeURIComponent(key)}`):(import.meta.env.VITE_MAP_STYLE_URL||`https://api.maptiler.com/maps/dataviz/style.json?key=${encodeURIComponent(key)}`));},[dark]);
  useEffect(()=>{if(focus)map.current?.flyTo({center:lnglat(focus),zoom,duration:500});},[focus?.[0],focus?.[1],zoom]);
  useEffect(()=>{
   const m=map.current;if(!m||!pickMode||!focus)return;
@@ -71,7 +74,7 @@ export function OperationsMap({vehicles,incidents,dispatches,selectedId,onSelect
    const stale=signal(v)!=='Sinal OK',color=stale?'#64748b':v.status==='DISPONIVEL'?'#08735a':v.status==='NO_LOCAL'?'#69419c':'#235fa4';
    let entry=old;
    if(!entry){const el=document.createElement('button');el.type='button';el.className='vehicle-marker';el.onclick=e=>{e.stopPropagation();callbacks.current.onSelect?.('vehicle',v.id);};entry={marker:new maplibregl.Marker({element:el,rotationAlignment:'map'}).setLngLat([v.longitude,v.latitude]).addTo(m),progress:0,route:null,frame:0,version:v.versao,samples:[],positionVersion:-1,displayProgress:0};markers.current.set(v.id,entry);}
-   const el=entry.marker.getElement();el.innerHTML=car(color);el.title=`${v.placa} · ${v.status==='DISPONIVEL'?'Em patrulha':v.status==='NO_LOCAL'?'No local':'Em deslocamento'} · ${signal(v)} · Último sinal: ${v.ultimoSinalEm??'Não recebido'}`;el.setAttribute('aria-label',el.title);el.style.visibility=m.getZoom()<11?'hidden':'visible';el.dataset.status=v.status;el.dataset.signal=signal(v);el.classList.toggle('selected',selectedId===v.id);
+   const el=entry.marker.getElement();el.innerHTML=car(color);el.title=`${vehicleRef(v)} · ${vehicleActivity(v.status)} · ${signal(v)}`;el.setAttribute('aria-label',el.title);el.style.visibility=m.getZoom()<11?'hidden':'visible';el.dataset.status=v.status;el.dataset.signal=signal(v);el.classList.toggle('selected',selectedId===v.id);
    const d=dispatches.find(x=>x.viaturaId===v.id&&!['CONCLUIDO','CANCELADO'].includes(x.status));const raw=d?.rota??v.patrulhaRota??null,points=geometry(raw),target=d?.progresso??v.patrulhaProgresso??0;
    const positionVersion=v.versaoPosicao??v.versao;
    const stop=stale||v.status==='NO_LOCAL'||matchMedia('(prefers-reduced-motion: reduce)').matches;
@@ -88,10 +91,10 @@ export function OperationsMap({vehicles,incidents,dispatches,selectedId,onSelect
    entry.progress=target;entry.route=raw;entry.version=v.versao;entry.positionVersion=positionVersion;
 
   }
-  for(const o of incidents.filter(x=>!['ENCERRADA','CANCELADA'].includes(x.status))){ids.add(o.id);let entry=markers.current.get(o.id);if(!entry){const el=document.createElement('button');el.type='button';el.className='incident-pin';el.textContent='!';el.onclick=e=>{e.stopPropagation();callbacks.current.onSelect?.('incident',o.id);};entry={marker:new maplibregl.Marker({element:el}).setLngLat([o.longitude,o.latitude]).addTo(m),progress:0,route:null,frame:0,version:0,samples:[],positionVersion:-1,displayProgress:0};markers.current.set(o.id,entry);}entry.marker.setLngLat([o.longitude,o.latitude]);entry.marker.getElement().setAttribute('aria-label',`${o.tipo}, prioridade ${PRIORITIES[o.prioridade-1]?.label??o.prioridade}`);entry.marker.getElement().style.backgroundColor=PRIORITIES[o.prioridade-1]?.color??'#b42332';entry.marker.getElement().classList.toggle('selected',selectedId===o.id);}
+  for(const o of incidents.filter(x=>!['ENCERRADA','CANCELADA'].includes(x.status))){ids.add(o.id);let entry=markers.current.get(o.id);if(!entry){const el=document.createElement('button');el.type='button';el.className='incident-pin';el.textContent='!';el.onclick=e=>{e.stopPropagation();callbacks.current.onSelect?.('incident',o.id);};entry={marker:new maplibregl.Marker({element:el}).setLngLat([o.longitude,o.latitude]).addTo(m),progress:0,route:null,frame:0,version:0,samples:[],positionVersion:-1,displayProgress:0};markers.current.set(o.id,entry);}entry.marker.setLngLat([o.longitude,o.latitude]);entry.marker.getElement().setAttribute('aria-label',`${o.tipo}, prioridade ${PRIORITIES[o.prioridade-1]?.label??o.prioridade}`);entry.marker.getElement().style.backgroundColor=PRIORITY_PIN[o.prioridade-1]??'#b42332';entry.marker.getElement().classList.toggle('selected',selectedId===o.id);}
   for(const [id,entry] of markers.current)if(!ids.has(id)){cancelAnimationFrame(entry.frame);entry.marker.remove();markers.current.delete(id);}
  },[vehicles,incidents,dispatches,selectedId,ready,showAllRoutes,age]);
  const selectedVehicle=vehicles.find(v=>v.id===selectedId);
  useEffect(()=>{if(following&&selectedVehicle)map.current?.easeTo({center:[selectedVehicle.longitude,selectedVehicle.latitude],duration:500});},[following,selectedVehicle?.latitude,selectedVehicle?.longitude]);
- return <div className={`map-shell ${pickMode?'map-shell--picking':''}`}><div ref={root} className="operations-map"/>{error&&<div className="map-warning" role="status">{error}</div>}<div className="map-controls"><button type="button" onClick={()=>map.current?.flyTo({center:lnglat(FEIRA),zoom:13})}>Centralizar cidade</button><button type="button" onClick={()=>setDark(x=>!x)}>{dark?'Tema claro':'Tema escuro'}</button>{selectedVehicle&&<button type="button" onClick={()=>setFollowing(x=>!x)}>{following?'Parar de acompanhar':'Acompanhar viatura'}</button>}</div>{selectedVehicle&&<div className="map-context"><strong>{selectedVehicle.placa}</strong> · {selectedVehicle.status==='DISPONIVEL'?'Em patrulha':selectedVehicle.status==='NO_LOCAL'?'No local':'Em deslocamento'} · {signal(selectedVehicle)}</div>}{pickMode?<div className="map-pick-help"><MapPin size={17}/><span>Clique para marcar o local · Arraste o pin para ajustar</span></div>:<details className={`map-legend ${compactLegend?'map-legend--compact':''}`} open={!compactLegend}><summary><Info size={16}/>Legenda</summary><div className="map-legend-items"><span><i style={{background:'#08735a'}}/>Disponível / patrulhando</span><span><i style={{background:'#235fa4'}}/>Em deslocamento</span><span><i style={{background:'#69419c'}}/>No local</span>{incidents.length>0&&<span><i style={{background:'#b42332'}}/>Ocorrência · cor por prioridade</span>}<span><i style={{background:'#64748b'}}/>Sinal atrasado / ausente</span></div></details>}</div>;
+ return <div className={`map-shell ${pickMode?'map-shell--picking':''}`}><div ref={root} className="operations-map"/>{error&&<div className="map-warning" role="status">{error}</div>}<div className="map-controls"><button type="button" onClick={()=>map.current?.flyTo({center:lnglat(FEIRA),zoom:13})}>Centralizar cidade</button>{selectedVehicle&&<button type="button" onClick={()=>setFollowing(x=>!x)}>{following?'Parar de acompanhar':'Acompanhar viatura'}</button>}</div>{selectedVehicle&&<div className="map-context"><strong>{vehicleRef(selectedVehicle)}</strong> · {vehicleActivity(selectedVehicle.status)} · {signal(selectedVehicle)}</div>}{pickMode?<div className="map-pick-help"><MapPin size={17}/><span>Clique para marcar o local · Arraste o pin para ajustar</span></div>:<details className={`map-legend ${compactLegend?'map-legend--compact':''}`} open={!compactLegend}><summary><Info size={16}/>Legenda</summary><div className="map-legend-items"><span><i style={{background:'#08735a'}}/>Disponível / patrulhando</span><span><i style={{background:'#235fa4'}}/>Em deslocamento</span><span><i style={{background:'#69419c'}}/>No local</span>{incidents.length>0&&<span><i style={{background:'#b42332'}}/>Ocorrência · cor por prioridade</span>}<span><i style={{background:'#64748b'}}/>Sinal atrasado / ausente</span></div></details>}</div>;
 }
