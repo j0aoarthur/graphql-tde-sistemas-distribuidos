@@ -16,6 +16,14 @@
     "./state": {
       "types": "./state.d.ts",
       "default": "./state.cjs"
+    },
+    "./plate": {
+      "types": "./plate.d.ts",
+      "default": "./plate.cjs"
+    },
+    "./motion": {
+      "types": "./motion.d.ts",
+      "default": "./motion.cjs"
     }
   }
 }

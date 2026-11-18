@@ -14,8 +14,8 @@ try{
  // Both replicas read the same persisted frame, then contend on its CAS.
  await Promise.all([step(d,2),step(d,2)]);
  const next=(await pool.query('SELECT * FROM "Despacho" WHERE id=$1',[d.id])).rows[0];
- assert.equal(next.progresso,.02);assert.equal(next.versao,1);
- await step(d,2);assert.equal((await pool.query('SELECT progresso FROM "Despacho" WHERE id=$1',[d.id])).rows[0].progresso,.02);
+ assert(next.progresso>0&&next.progresso<.02);assert.equal(next.versao,1);
+ await step(d,2);assert.equal((await pool.query('SELECT progresso FROM "Despacho" WHERE id=$1',[d.id])).rows[0].progresso,next.progresso);
  await pool.query(`UPDATE "Viatura" SET status='DISPONIVEL' WHERE id=$1`,[v.id]);
  const p=(await pool.query(`INSERT INTO "Patrulha" (id,"viaturaId",rota,progresso,versao,"duracaoSegundos","inicioEm",status) VALUES(gen_random_uuid(),$1,$2::jsonb,0,0,100,now(),'ATIVA') RETURNING *`,[v.id,JSON.stringify(route)])).rows[0];
  const snapshot={...v,status:'DISPONIVEL',patrulhaId:p.id,patrulhaVersao:p.versao,rota:route,progresso:0,duracaoSegundos:100,versaoPosicao:1};

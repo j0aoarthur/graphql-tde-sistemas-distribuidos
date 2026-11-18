@@ -19,6 +19,6 @@ try{
   await until(async()=>{const r=await pool.query('SELECT status FROM "Ocorrencia" WHERE id=$1',[oc.id]);return ['DESPACHADA','EM_ATENDIMENTO'].includes(r.rows[0]?.status);});
   await until(async()=>Number((await redis.xpending(stream,'sdv:dispatch'))[0])===0);
   assert.equal((await fleet.query('SELECT count(*) FROM "Despacho" WHERE "ocorrenciaId"=$1',[oc.id])).rows[0].count,'1');
-  console.log(`PASSOU: crash ${fault}, pending recuperado e projeção convergente sem despacho duplicado`);await stop();await redis.del(stream);
+  console.log(`PASSOU: crash ${fault}, pending recuperado e projeção convergente sem despacho duplicado`);await query('mutation($id:ID!){cancelarOcorrencia(id:$id,motivo:"Limpeza do teste de recuperação"){id}}',{id:oc.id},token);await until(async()=>{const r=await pool.query('SELECT status FROM "Ocorrencia" WHERE id=$1',[oc.id]);return r.rows[0]?.status==='CANCELADA';});await stop();await redis.del(stream);
  }
 }finally{await stop();await Promise.all([pool.end(),fleet.end(),redis.quit()]);}

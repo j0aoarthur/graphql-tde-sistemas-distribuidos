@@ -1,6 +1,7 @@
 extend schema @link(url: "https://specs.apollo.dev/federation/v2.3", import: ["@key"])
 type Viatura @key(fields:"id") {
   id: ID!
+  codigo: Int!
   placa: String!
   status: String!
   latitude: Float!
@@ -36,6 +37,7 @@ type Despacho {
   saidaEm: String
   etaOriginalSegundos: Float
   etaAtualSegundos: Float
+  previsaoChegadaInicialEm: String
   previsaoChegadaEm: String
   previsaoAtualizadaEm: String
   fatorSimulacaoAplicado: Float

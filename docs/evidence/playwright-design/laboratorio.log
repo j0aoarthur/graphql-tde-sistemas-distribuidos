@@ -1,0 +1,13 @@
+Código: 701c92ec72344047de2e23541b39ecabe83ebe67
+laboratório adicional + revalidação 360px com Sincronizar
+
+
+Running 2 tests using 1 worker
+
+(node:140250) Warning: The 'NO_COLOR' env is ignored due to the 'FORCE_COLOR' env being set.
+(Use `node --trace-warnings ...` to show where the warning was created)
+
+
+[1/2] tests/design-actions.spec.ts:17:6 › design e navegação das seis telas em 360px
+[2/2] tests/design-actions.spec.ts:74:5 › laboratório: pausar, retomar, ajustar velocidade por teclado e restaurar 1×
+  2 passed (14.5s)

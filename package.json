@@ -27,7 +27,8 @@
     "test:e2e": "playwright test",
     "lint": "eslint .",
     "test:operations": "node tests/operations.mjs && node tests/race.mjs && node tests/metrics.mjs",
-    "test:recovery": "node tests/recovery.mjs"
+    "test:recovery": "node tests/recovery.mjs",
+    "test:concurrency:tela": "NODE_ENV=test node tests/concurrency.mjs --manter=180"
   },
   "devDependencies": {
     "@axe-core/playwright": "^4.14.0",

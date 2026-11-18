@@ -2,15 +2,15 @@
 
 Monorepo acadêmico **GraphQL Federation + NestJS + PostgreSQL + Redis Streams + React + OSRM + Terraform/AWS**. Duas centrais ADMIN cadastradas via CLI operam um conjunto de viaturas fictícias em Feira de Santana, BA. Nenhuma interface de motorista existe.
 
-> **Status**: entrega integrada de código-fonte, ainda **não homologada em runtime**. Foram realizados testes unitários offline e validações de sintaxe. A execução Docker/PostgreSQL/Redis/OSRM, integração GraphQL, build npm, `terraform validate` e deploy AWS requerem ambiente com dependências e credenciais; **não foram executados nesta entrega**. Nunca utilizar para emergências reais.
+> **Status**: aplicação de simulação v3.2 com testes executáveis. Consulte os [refinamentos de movimento e formulário](docs/SDV_REFINAMENTOS_V3_2.md), os [resultados desta validação](docs/SDV_REFINAMENTOS_V3_2_RESULTADOS.md) e a [matriz da entrega anterior](docs/SDV_V3_2_RESULTADOS.md). Cobertura e estilos MapTiler reais dependem de chave restrita configurada; não houve deploy AWS nesta tarefa. Nunca utilizar para emergências reais.
 
 ## Funcionalidades implementadas em código
 
-- **Frontend React responsivo:** login; visão geral; mapa em Leaflet/OpenStreetMap; abertura de ocorrências com seleção de ponto; lista e detalhes; encerramento/cancelamento; painel da frota e cadastro; histórico dos despachos; laboratório de simulação com pausa, velocidade e falha de sinal; reconexão de subscription; feedback e estados vazios.
+- **Frontend React responsivo:** login; visão geral; mapa vetorial MapLibre/MapTiler; abertura de ocorrências com seleção de ponto; lista e detalhes; encerramento/cancelamento; painel da frota e cadastro; histórico dos despachos; laboratório de simulação com pausa, velocidade e falha de sinal; reconexão de subscription; feedback e estados vazios.
 - **API:** Apollo Gateway + subgraphs federados NestJS (`ocorrencias`/`viaturas`), queries seletivas, JWT ADMIN e autorização nos resolvers, DTOs validados nos endpoints.
 - **Consistência:** ocorrência+outbox em uma transação; Redis Streams com XREADGROUP, XACK pós-efeito, XAUTOCLAIM; idempotência por chave de requisição e unicidade de despacho; lock Redis SET NX PX com token, seguido de update condicional e índice único parcial PostgreSQL.
 - **Reconciliação:** consumer reprocessa ocorrências RECEBIDA/AGUARDANDO, finais pendentes e eventos da outbox de Viaturas, cobrindo crash depois de commits; eventuais atualizações entre DBs são reconciliadas, sem transação distribuída.
-- **Tempo real:** servidor GraphQL WebSocket `/subscriptions` com Pub/Sub Redis; eventos provocam refetch do snapshot GraphQL. Fallback por polling a cada 12 segundos.
+- **Tempo real:** servidor GraphQL WebSocket `/subscriptions` com Pub/Sub Redis; snapshot inicial, atualizações dirigidas por entidade e reconciliação por versões. Fallback por polling a cada 30 segundos.
 - **Roteamento:** worker GPS calcula a rota OSRM sobre ruas reais de Feira, persiste geometria/distância/duração, avança posição com compare-and-swap e marca chegada. Nunca desenha uma rota reta como se fosse viária. OSRM indisponível deixa rota pendente, sem falsificar trânsito real.
 - **Infra:** Docker, migrations SQL de versão, seeds idempotentes, Terraform AWS (`us-east-1`, workloads e banco Single-AZ, ALB 2 subnets exigidas, RDS, ElastiCache, ECS, ECR, CloudFront/S3, IAM/OIDC, Secrets Manager, CloudWatch, AWS Budgets), GitHub Actions CI e deploy da aplicação.
 
@@ -51,7 +51,8 @@ infra/docker/             imagens de produção, nginx, OSRM
 
 ## Testes
 
-- `npm test` — valida ranking Haversine, coordenadas e interpolação de rota.
+- `npm test` — valida ranking, coordenadas, versões, geometria e movimento físico sobre ruas OSRM gravadas.
+- `node tests/urban-motion.mjs` e `node tests/routing-latency.mjs` — validam velocidades, área urbana e GPS independente de roteamento lento, em ambiente local isolado de teste.
 - `NODE_ENV=test npm run test:concurrency` — com as duas centrais, DBs e workers isolados já ativos, dispara mutations simultâneas e valida IDs distintos e ausência de duplicidade.
 - `npm run build` — build TS/React; exige npm install e clients Prisma gerados.
 - GitHub Actions `ci.yml` executa build e teste de concorrência com PostgreSQL+Redis reais, além de validar Terraform.

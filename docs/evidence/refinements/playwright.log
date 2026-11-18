@@ -1,0 +1,29 @@
+Código validado: 6e39dd9583d8882524030eef28f5cd269fb29e59
+Ambiente local isolado; 2026-11-05 UTC.
+
+Comando: npx playwright test --workers=1 --reporter=line
+
+Running 16 tests using 1 worker
+
+(node:57141) Warning: The 'NO_COLOR' env is ignored due to the 'FORCE_COLOR' env being set.
+(Use `node --trace-warnings ...` to show where the warning was created)
+
+
+[1/16] tests/accessibility.spec.ts:3:5 › contraste WCAG AA e texto funcional no workspace
+[2/16] tests/gps.spec.ts:2:5 › sinal atrasado congela marcador e informa o horário
+[3/16] tests/https.spec.ts:3:5 › cookie Secure e sessão após reload em proxy HTTPS local
+[4/16] tests/lifecycle.spec.ts:3:5 › ciclo completo na interface preserva chegada após F5 e retoma patrulha
+[5/16] tests/operations.spec.ts:14:6 › mapa, endereço, CEP, pin e confirmação 1366
+[6/16] tests/operations.spec.ts:14:6 › mapa, endereço, CEP, pin e confirmação 1440
+[7/16] tests/operations.spec.ts:14:6 › mapa, endereço, CEP, pin e confirmação 390
+[8/16] tests/operations.spec.ts:56:5 › falha de busca permite pin e referência; cancelar não cria ocorrência
+[9/16] tests/operations.spec.ts:66:5 › reverse pendente bloqueia confirmação e preserva edições diante de resposta antiga
+[10/16] tests/refinements.spec.ts:3:5 › navegação ampla, mapa dedicado, prioridades e formulário sem emojis
+[11/16] tests/refinements.spec.ts:20:5 › trecho restante, interpolação confirmada e tempos em minutos e segundos
+[12/16] tests/renderer.spec.ts:2:5 › renderizador interpola na curva sem cortar quarteirão
+[13/16] tests/scene.spec.ts:3:5 › três despachos, cores por status, seleção, tema, zoom estável e movimento reduzido
+[14/16] tests/session.spec.ts:3:5 › restaura sessão após F5, duas abas e revoga logout
+[15/16] tests/session.spec.ts:24:5 › renova uma vez após credencial HTTP expirada
+[16/16] tests/websocket.spec.ts:3:5 › expiração real do JWT fecha WS e restaura credencial sem logout
+  16 passed (1.8m)
+

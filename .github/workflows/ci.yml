@@ -61,6 +61,8 @@ jobs:
           cat /tmp/{ocorrencias,viaturas,worker,gateway}.log
           exit 1
       - run: npm run test:operations
+      - run: node tests/urban-motion.mjs
+      - run: node tests/routing-latency.mjs
       - run: node tests/gps.mjs
       - run: npm run test:concurrency
       - name: Falhas antes de ACK e após commit em Viaturas

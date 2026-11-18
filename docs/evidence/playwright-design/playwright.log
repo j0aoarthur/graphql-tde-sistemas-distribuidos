@@ -1,0 +1,38 @@
+Código: 701c92ec72344047de2e23541b39ecabe83ebe67
+npx playwright test --workers=1 --reporter=line (27 cenários na rodada completa)
+
+
+Running 27 tests using 1 worker
+
+(node:130853) Warning: The 'NO_COLOR' env is ignored due to the 'FORCE_COLOR' env being set.
+(Use `node --trace-warnings ...` to show where the warning was created)
+
+
+[1/27] tests/accessibility.spec.ts:3:5 › contraste WCAG AA e texto funcional no workspace
+[2/27] tests/design-actions.spec.ts:17:6 › design e navegação das seis telas em 1440px
+[3/27] tests/design-actions.spec.ts:17:6 › design e navegação das seis telas em 1024px
+[4/27] tests/design-actions.spec.ts:17:6 › design e navegação das seis telas em 820px
+[5/27] tests/design-actions.spec.ts:17:6 › design e navegação das seis telas em 768px
+[6/27] tests/design-actions.spec.ts:17:6 › design e navegação das seis telas em 390px
+[7/27] tests/design-actions.spec.ts:17:6 › design e navegação das seis telas em 360px
+[8/27] tests/design-actions.spec.ts:29:5 › ações do mapa: filtros, seleção, acompanhamento, pan, zoom e tema
+[9/27] tests/design-actions.spec.ts:40:5 › teclado no formulário: sugestões, foco, selects e confirmação
+[10/27] tests/design-actions.spec.ts:46:5 › despacho pela interface: registrar, pausar, retomar e cancelar com motivo
+[11/27] tests/design-actions.spec.ts:57:5 › tabelas e filtros acessíveis por teclado; legenda compacta da frota
+[12/27] tests/design-actions.spec.ts:63:5 › cadastro de viatura: mapa, capacidade, validação e persistência
+[13/27] tests/gps.spec.ts:2:5 › sinal atrasado congela marcador e informa o horário
+[14/27] tests/https.spec.ts:3:5 › cookie Secure e sessão após reload em proxy HTTPS local
+[15/27] tests/lifecycle.spec.ts:3:5 › ciclo completo na interface preserva chegada após F5 e retoma patrulha
+[16/27] tests/operations.spec.ts:14:6 › mapa, endereço, CEP, pin e confirmação 1366
+[17/27] tests/operations.spec.ts:14:6 › mapa, endereço, CEP, pin e confirmação 1440
+[18/27] tests/operations.spec.ts:14:6 › mapa, endereço, CEP, pin e confirmação 390
+[19/27] tests/operations.spec.ts:56:5 › falha de busca permite pin e referência; cancelar não cria ocorrência
+[20/27] tests/operations.spec.ts:66:5 › reverse pendente bloqueia confirmação e preserva edições diante de resposta antiga
+[21/27] tests/refinements.spec.ts:3:5 › navegação ampla, mapa dedicado, prioridades e formulário sem emojis
+[22/27] tests/refinements.spec.ts:20:5 › trecho restante, interpolação confirmada e tempos em minutos e segundos
+[23/27] tests/renderer.spec.ts:2:5 › renderizador interpola na curva sem cortar quarteirão
+[24/27] tests/scene.spec.ts:3:5 › três despachos, cores por status, seleção, tema, zoom estável e movimento reduzido
+[25/27] tests/session.spec.ts:3:5 › restaura sessão após F5, duas abas e revoga logout
+[26/27] tests/session.spec.ts:24:5 › renova uma vez após credencial HTTP expirada
+[27/27] tests/websocket.spec.ts:3:5 › expiração real do JWT fecha WS e restaura credencial sem logout
+  27 passed (3.4m)

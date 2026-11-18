@@ -8,6 +8,7 @@ import { PrismaClient, Prisma } from './generated/client';
 import Redis from 'ioredis';
 import * as jwt from 'jsonwebtoken';
 import { rankViaturas } from '@sdv/shared';
+import { isValidPlate, normalizePlate } from '@sdv/shared/plate';
 import { randomUUID } from 'node:crypto';
 import { join } from 'node:path';
 
@@ -29,7 +30,7 @@ class DispatchService implements OnModuleDestroy {
   async onModuleDestroy(){this.redis.disconnect();}
   async getSimulation(){
     const [factor,paused,signal]=await Promise.all([this.redis.get('sdv:sim:factor'),this.redis.get('sdv:sim:paused'),this.redis.get('sdv:sim:signal-lost')]);
-    return {fator:factor?Number(factor):12,pausada:paused==='1',sinalIndisponivel:signal==='1'};
+    return {fator:factor?Number(factor):1,pausada:paused==='1',sinalIndisponivel:signal==='1'};
   }
   async setSimulation(fator:number,pausada:boolean){
     await this.db.despacho.updateMany({where:{status:{in:['CONFIRMADO','EM_DESLOCAMENTO']}},data:{previsaoChegadaEm:null,versao:{increment:1}}});
@@ -102,7 +103,7 @@ class ViaturaResolver {
     const durations=await this.db.$queryRaw<Array<{total:number}>>`SELECT COALESCE(SUM(GREATEST(0,EXTRACT(EPOCH FROM LEAST("chegadaEm",${range.lt})-GREATEST("saidaEm",${range.gte})))),0)::float8 AS total FROM "Despacho" WHERE "viaturaId"=${id}::uuid AND "chegadaEm" IS NOT NULL AND "saidaEm" IS NOT NULL AND "saidaEm"<${range.lt} AND "chegadaEm">${range.gte}`;
     return {tempoTotalEmDeslocamentoHoje:durations[0].total,duracaoTurno:turno?Math.floor((Date.now()-turno.inicioEm.getTime())/1000):null,despachosIniciadosHoje:iniciados,atendimentosConcluidosHoje:concluidos,canceladosHoje:cancelados,operandoDesde:turno?.inicioEm?.toISOString(),ultimoSinalEm:v?.ultimoSinalEm?.toISOString(),situacaoSinal:!v?.ultimoSinalEm?'SEM_SINAL':Date.now()-v.ultimoSinalEm.getTime()>30000?'SEM_SINAL':Date.now()-v.ultimoSinalEm.getTime()>10000?'ATRASADO':'OK'};
   }
-  @Query('despachosViatura') despachosViatura(@Context() ctx:any,@Args('id') id:string,@Args('cursor') cursor?:string,@Args('limit') limit=20){requireAdmin(ctx);return this.db.despacho.findMany({where:{viaturaId:id},orderBy:{id:'asc'},take:Math.min(100,Math.max(1,limit)),...(cursor?{cursor:{id:cursor},skip:1}:{})});}
+  @Query('despachosViatura') despachosViatura(@Context() ctx:any,@Args('id') id:string,@Args('cursor') cursor?:string,@Args('limit') limit=20){requireAdmin(ctx);return this.db.despacho.findMany({where:{viaturaId:id},orderBy:[{criadoEm:'desc'},{id:'desc'}],take:Math.min(100,Math.max(1,limit)),...(cursor?{cursor:{id:cursor},skip:1}:{})});}
   @Query('listarViaturas') async listarViaturas(@Context() ctx:any,@Args('status') status?:string){requireAdmin(ctx);return this.db.viatura.findMany({include:{patrulha:true,turnos:{where:{fimEm:null},take:1}},where:status?{status}:undefined,orderBy:{placa:'asc'}});}
   @Query('consultarViatura') async consultarViatura(@Context() ctx:any,@Args('id') id:string){requireAdmin(ctx);return this.db.viatura.findUnique({where:{id},include:{patrulha:true,turnos:{where:{fimEm:null},take:1}}});}
   @Query('listarDespachos') async listarDespachos(@Context() ctx:any){requireAdmin(ctx);return this.db.despacho.findMany({include:{viatura:true},orderBy:{criadoEm:'desc'},take:400});}
@@ -118,8 +119,10 @@ class ViaturaResolver {
   }
   @Mutation('cadastrarViatura') async cadastrarViatura(@Context() ctx:any,@Args('input') input:any){
     requireAdmin(ctx);
-    if(!/^[A-Z0-9-]{5,10}$/i.test(input.placa)||!validLatLon(input.latitude,input.longitude)||!Number.isInteger(input.capacidade)||input.capacidade<1||input.capacidade>8)throw new BadRequestException('Dados de viatura inválidos');
-    const created=await this.db.viatura.create({data:{placa:input.placa.toUpperCase(),latitude:input.latitude,longitude:input.longitude,capacidade:input.capacidade,turnos:{create:{iniciadoPor:'ADMIN'}}}});
+    if(!isValidPlate(input.placa))throw new BadRequestException('Placa inválida. Use o formato ABC-1234 ou ABC1D23.');
+    if(!validLatLon(input.latitude,input.longitude)||!Number.isInteger(input.capacidade)||input.capacidade<1||input.capacidade>8)throw new BadRequestException('Dados de viatura inválidos');
+    // `codigo` (numero de referencia) e gerado pelo banco; a placa e normalizada e unica.
+    const created=await this.db.viatura.create({data:{placa:normalizePlate(input.placa),latitude:input.latitude,longitude:input.longitude,capacidade:input.capacidade,turnos:{create:{iniciadoPor:'ADMIN'}}}}).catch((error:unknown)=>{if(error instanceof Prisma.PrismaClientKnownRequestError&&error.code==='P2002')throw new ConflictException('Já existe uma viatura cadastrada com esta placa.');throw error;});
     await this.dispatcher.emit('VIATURA',created.id);return created;
   }
   @Mutation('atualizarPosicaoViatura') async atualizarPosicaoViatura(@Context() ctx:any,@Args('id') id:string,@Args('latitude') latitude:number,@Args('longitude') longitude:number){
@@ -148,6 +151,7 @@ class ViaturaResolver {
 }
 @Resolver('Despacho')
 class DespachoResolver {
+ @ResolveField('previsaoChegadaInicialEm') previsaoChegadaInicialEm(@Parent() d:any){return d.previsaoChegadaInicialEm?.toISOString()??null;}
  @ResolveField('previsaoChegadaEm') previsaoChegadaEm(@Parent() d:any){return d.previsaoChegadaEm?.toISOString()??null;}
  @ResolveField('previsaoAtualizadaEm') previsaoAtualizadaEm(@Parent() d:any){return d.previsaoAtualizadaEm?.toISOString()??null;}
  @ResolveField('criadoEm') criadoEm(@Parent() d:any){return d.criadoEm?.toISOString()??null;}
