@@ -1,0 +1,27 @@
+Código validado: 6e39dd9583d8882524030eef28f5cd269fb29e59
+Ambiente local isolado; 2026-11-05 UTC.
+
+Comando: npm test
+
+> sdv-monorepo@0.1.0 test
+> node --test tests/*.test.cjs
+
+✔ distância zero para mesmo ponto (0.876969ms)
+✔ ordena apenas viaturas livres e com desempate estável (8.881653ms)
+✔ valida latitude e longitude (0.375121ms)
+✔ urban physical motion accelerates gradually, varies per vehicle and slows before a turn (7.053809ms)
+✔ step splitting, complete arrival and no catch-up teleport after a long outage (0.486876ms)
+✔ patrol rejects routes leaving urban perimeter and permits bounded return of legacy positions (0.359138ms)
+✔ recorded OSRM street geometry in Feira: bounded speed, corner braking and stopped arrival (10.194572ms)
+✔ início e fim da rota (1.490562ms)
+✔ interpolação acompanha geometria real (quebra de direção) (0.2243ms)
+✔ reconexão e eventos atrasados não regridem versões ou heartbeat (0.704246ms)
+ℹ tests 10
+ℹ suites 0
+ℹ pass 10
+ℹ fail 0
+ℹ cancelled 0
+ℹ skipped 0
+ℹ todo 0
+ℹ duration_ms 260.219775
+

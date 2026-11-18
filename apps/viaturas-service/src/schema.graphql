@@ -1,0 +1,70 @@
+extend schema @link(url: "https://specs.apollo.dev/federation/v2.3", import: ["@key"])
+type Viatura @key(fields:"id") {
+  id: ID!
+  codigo: Int!
+  placa: String!
+  status: String!
+  latitude: Float!
+  longitude: Float!
+  capacidade: Int!
+  versao: Int!
+  ultimoSinalEm: String
+  ultimaPosicaoEm: String
+  ultimoMovimentoEm: String
+  direcaoGraus: Float!
+  velocidadeMps: Float!
+  versaoPosicao: Int!
+  patrulhaRota: String
+  patrulhaProgresso: Float
+  operandoDesde: String
+  atualizadoEm: String!
+}
+type Despacho {
+  versao: Int!
+  id: ID!
+  ocorrenciaId: ID!
+  viaturaId: ID!
+  viatura: Viatura!
+  status: String!
+  distanciaMetros: Float
+  duracaoSegundos: Float
+  progresso: Float!
+  rota: String
+  simulacaoPausada: Boolean!
+  criadoEm: String!
+  chegadaEm: String
+  despachadoEm: String!
+  saidaEm: String
+  etaOriginalSegundos: Float
+  etaAtualSegundos: Float
+  previsaoChegadaInicialEm: String
+  previsaoChegadaEm: String
+  previsaoAtualizadaEm: String
+  fatorSimulacaoAplicado: Float
+  versaoPrevisao: Int!
+  origemDados: String!
+  previsaoGeradaEm: String
+  distanciaInicialMetros: Float
+  concluidoEm: String
+}
+type EstadoSimulacao { fator: Float! pausada: Boolean! sinalIndisponivel: Boolean! }
+input NovaViaturaInput { placa: String! latitude: Float! longitude: Float! capacidade: Int! }
+type PrevisaoDespacho { calculadoEm:String! viaturaCandidataId:ID distanciaMetros:Float duracaoViariaSegundos:Float origemEstimativa:String! qualidadeEstimativa:String! }
+type EstatisticasViatura {tempoTotalEmDeslocamentoHoje:Float! duracaoTurno:Int despachosIniciadosHoje:Int! atendimentosConcluidosHoje:Int! canceladosHoje:Int! operandoDesde:String ultimoSinalEm:String situacaoSinal:String!}
+type Query {
+  preverDespacho(latitude:Float!,longitude:Float!):PrevisaoDespacho!
+  estatisticasViatura(id:ID!,dataLocal:String):EstatisticasViatura!
+  despachosViatura(id:ID!,cursor:ID,limit:Int):[Despacho!]!
+  listarViaturas(status: String): [Viatura!]!
+  consultarViatura(id: ID!): Viatura
+  listarDespachos: [Despacho!]!
+  estadoSimulacao: EstadoSimulacao!
+  consultarDespacho(id: ID!): Despacho
+}
+type Mutation {
+  cadastrarViatura(input: NovaViaturaInput!): Viatura!
+  atualizarPosicaoViatura(id: ID!, latitude: Float!, longitude: Float!): Viatura!
+  pausarSimulacao(despachoId: ID!, pausada: Boolean!): Despacho!
+  configurarSimulacao(fator: Float!, pausada: Boolean!): EstadoSimulacao!
+  simularFalhaGps(segundos: Int!): EstadoSimulacao!
+}

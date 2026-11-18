@@ -1,0 +1,58 @@
+# Compose funcional para desenvolvimento após: ./scripts/prepare-osrm.sh
+services:
+  osrm:
+    image: ghcr.io/project-osrm/osrm-backend:latest
+    command: ["osrm-routed", "--algorithm", "mld", "/data/feira.osrm"]
+    volumes:
+      - ./data/osrm:/data:ro
+    ports: ["127.0.0.1:5000:5000"]
+  ocorrencias:
+    build: {context: ., dockerfile: infra/docker/Dockerfile, args: {SERVICE: ocorrencias-service}}
+    environment:
+      PORT: 4001
+      OCC_DATABASE_URL: postgresql://sdv:sdv_dev_only@postgres:5432/ocorrencias_db
+      JWT_SECRET: ${JWT_SECRET}
+    depends_on: [postgres]
+    ports: ["127.0.0.1:4001:4001"]
+  viaturas:
+    build: {context: ., dockerfile: infra/docker/Dockerfile, args: {SERVICE: viaturas-service}}
+    environment:
+      PORT: 4002
+      VIATURAS_DATABASE_URL: postgresql://sdv:sdv_dev_only@postgres:5432/viaturas_db
+      REDIS_URL: redis://redis:6379
+      JWT_SECRET: ${JWT_SECRET}
+      INTERNAL_SERVICE_TOKEN: ${INTERNAL_SERVICE_TOKEN}
+    depends_on: [postgres,redis]
+    ports: ["127.0.0.1:4002:4002"]
+  gateway:
+    build: {context: ., dockerfile: infra/docker/Dockerfile, args: {SERVICE: gateway}}
+    environment:
+      PORT: 4000
+      OCCORRENCIAS_URL: http://ocorrencias:4001/graphql
+      VIATURAS_URL: http://viaturas:4002/graphql
+      REDIS_URL: redis://redis:6379
+      JWT_SECRET: ${JWT_SECRET}
+      FRONTEND_ORIGIN: http://localhost:5173
+    depends_on: [ocorrencias,viaturas,redis]
+    ports: ["127.0.0.1:4000:4000"]
+  worker:
+    build: {context: ., dockerfile: infra/docker/Dockerfile, args: {SERVICE: dispatch-worker}}
+    environment:
+      OCC_DATABASE_URL: postgresql://sdv:sdv_dev_only@postgres:5432/ocorrencias_db
+      VIATURAS_DATABASE_URL: postgresql://sdv:sdv_dev_only@postgres:5432/viaturas_db
+      VIATURAS_INTERNAL_URL: http://viaturas:4002/internal/dispatch
+      INTERNAL_SERVICE_TOKEN: ${INTERNAL_SERVICE_TOKEN}
+      REDIS_URL: redis://redis:6379
+    depends_on: [postgres,redis,viaturas]
+    deploy: {replicas: 2}
+  simulator:
+    build: {context: ., dockerfile: infra/docker/Dockerfile, args: {SERVICE: gps-simulator}}
+    environment:
+      VIATURAS_DATABASE_URL: postgresql://sdv:sdv_dev_only@postgres:5432/viaturas_db
+      REDIS_URL: redis://redis:6379
+      OSRM_URL: http://osrm:5000
+    depends_on: [postgres,redis,osrm]
+  frontend:
+    build: {context: ., dockerfile: infra/docker/Dockerfile.frontend}
+    depends_on: [gateway]
+    ports: ["127.0.0.1:8080:80"]

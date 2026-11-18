@@ -1,0 +1,106 @@
+Código validado: 6e39dd9583d8882524030eef28f5cd269fb29e59
+Ambiente local isolado; 2026-11-05 UTC.
+
+Comando: npm run db:generate
+
+> sdv-monorepo@0.1.0 db:generate
+> npm run db:generate -w @sdv/ocorrencias && npm run db:generate -w @sdv/viaturas
+
+
+> @sdv/ocorrencias@0.1.0 db:generate
+> prisma generate --schema prisma/schema.prisma
+
+Prisma schema loaded from prisma/schema.prisma
+
+✔ Generated Prisma Client (v6.19.0) to ./src/generated/client in 151ms
+
+Start by importing your Prisma Client (See: https://pris.ly/d/importing-client)
+
+Tip: Need your database queries to be 1000x faster? Accelerate offers you that and more: https://pris.ly/tip-2-accelerate
+
+
+> @sdv/viaturas@0.1.0 db:generate
+> prisma generate --schema prisma/schema.prisma
+
+Prisma schema loaded from prisma/schema.prisma
+
+✔ Generated Prisma Client (v6.19.0) to ./src/generated/client in 105ms
+
+Start by importing your Prisma Client (See: https://pris.ly/d/importing-client)
+
+Tip: Need your database queries to be 1000x faster? Accelerate offers you that and more: https://pris.ly/tip-2-accelerate
+
+
+Comando: npm run db:migrate
+
+> sdv-monorepo@0.1.0 db:migrate
+> npm run db:migrate -w @sdv/ocorrencias && npm run db:migrate -w @sdv/viaturas
+
+
+> @sdv/ocorrencias@0.1.0 db:migrate
+> prisma migrate deploy --schema prisma/schema.prisma
+
+Prisma schema loaded from prisma/schema.prisma
+Datasource "db": PostgreSQL database "ocorrencias_db", schema "public" at "127.0.0.1:55432"
+
+5 migrations found in prisma/migrations
+
+Applying migration `20261103000000_init`
+Applying migration `20261105000000_sessions`
+Applying migration `20261105010000_operations`
+Applying migration `20261105020000_versions`
+Applying migration `20261105040000_session_history`
+
+The following migration(s) have been applied:
+
+migrations/
+  └─ 20261103000000_init/
+    └─ migration.sql
+  └─ 20261105000000_sessions/
+    └─ migration.sql
+  └─ 20261105010000_operations/
+    └─ migration.sql
+  └─ 20261105020000_versions/
+    └─ migration.sql
+  └─ 20261105040000_session_history/
+    └─ migration.sql
+      
+All migrations have been successfully applied.
+
+> @sdv/viaturas@0.1.0 db:migrate
+> prisma migrate deploy --schema prisma/schema.prisma
+
+Prisma schema loaded from prisma/schema.prisma
+Datasource "db": PostgreSQL database "viaturas_db", schema "public" at "127.0.0.1:55432"
+
+5 migrations found in prisma/migrations
+
+Applying migration `20261103000000_init`
+Applying migration `20261105010000_operations`
+Applying migration `20261105020000_versions`
+Applying migration `20261105030000_estimates_signal`
+Applying migration `20261105040000_initial_arrival_forecast`
+
+The following migration(s) have been applied:
+
+migrations/
+  └─ 20261103000000_init/
+    └─ migration.sql
+  └─ 20261105010000_operations/
+    └─ migration.sql
+  └─ 20261105020000_versions/
+    └─ migration.sql
+  └─ 20261105030000_estimates_signal/
+    └─ migration.sql
+  └─ 20261105040000_initial_arrival_forecast/
+    └─ migration.sql
+      
+All migrations have been successfully applied.
+
+Comando: npm run seed
+
+> sdv-monorepo@0.1.0 seed
+> tsx scripts/seed-demo.ts
+
+Seed idempotente: 2 centrais ADMIN e 12 viaturas fictícias em Feira de Santana.
+

@@ -1,0 +1,185 @@
+# Schema GraphQL do SDV (gerado por scripts/export-schema.mjs a partir do gateway). Não editar à mão.
+input AbrirOcorrenciaInput {
+  descricao: String!
+  enderecoFormatado: String!
+  bairro: String
+  cep: String
+  numero: String
+  complemento: String
+  referencia: String
+  observacoes: String
+  origemLocalizacao: String!
+  precisaoLocalizacao: String!
+  localConfirmado: Boolean!
+  tipo: String!
+  prioridade: Int!
+  latitude: Float!
+  longitude: Float!
+  clientRequestId: ID!
+}
+
+type Admin {
+  id: ID!
+  nome: String!
+  email: String!
+  centralId: ID!
+  papel: String!
+}
+
+type Central {
+  id: ID!
+  codigo: String!
+  nome: String!
+  ativo: Boolean!
+}
+
+type Despacho {
+  versao: Int!
+  id: ID!
+  ocorrenciaId: ID!
+  viaturaId: ID!
+  viatura: Viatura!
+  status: String!
+  distanciaMetros: Float
+  duracaoSegundos: Float
+  progresso: Float!
+  rota: String
+  simulacaoPausada: Boolean!
+  criadoEm: String!
+  chegadaEm: String
+  despachadoEm: String!
+  saidaEm: String
+  etaOriginalSegundos: Float
+  etaAtualSegundos: Float
+  previsaoChegadaInicialEm: String
+  previsaoChegadaEm: String
+  previsaoAtualizadaEm: String
+  fatorSimulacaoAplicado: Float
+  versaoPrevisao: Int!
+  origemDados: String!
+  previsaoGeradaEm: String
+  distanciaInicialMetros: Float
+  concluidoEm: String
+}
+
+
+type EstadoSimulacao {
+  fator: Float!
+  pausada: Boolean!
+  sinalIndisponivel: Boolean!
+}
+
+type EstatisticasViatura {
+  tempoTotalEmDeslocamentoHoje: Float!
+  duracaoTurno: Int
+  despachosIniciadosHoje: Int!
+  atendimentosConcluidosHoje: Int!
+  canceladosHoje: Int!
+  operandoDesde: String
+  ultimoSinalEm: String
+  situacaoSinal: String!
+}
+
+type EventoOcorrencia {
+  id: ID!
+  tipo: String!
+  ocorridoEm: String!
+  registradoEm: String!
+  origemServico: String!
+  autor: String!
+  adminId: ID
+  centralId: ID
+  descricao: String!
+}
+
+type LoginResponse {
+  accessToken: String!
+  admin: Admin!
+}
+
+type Mutation {
+  login(email: String!, senha: String!): LoginResponse!
+  abrirOcorrencia(input: AbrirOcorrenciaInput!): Ocorrencia!
+  encerrarOcorrencia(id: ID!): Ocorrencia!
+  cancelarOcorrencia(id: ID!, motivo: String!): Ocorrencia!
+  cadastrarViatura(input: NovaViaturaInput!): Viatura!
+  atualizarPosicaoViatura(id: ID!, latitude: Float!, longitude: Float!): Viatura!
+  pausarSimulacao(despachoId: ID!, pausada: Boolean!): Despacho!
+  configurarSimulacao(fator: Float!, pausada: Boolean!): EstadoSimulacao!
+  simularFalhaGps(segundos: Int!): EstadoSimulacao!
+}
+
+input NovaViaturaInput {
+  placa: String!
+  latitude: Float!
+  longitude: Float!
+  capacidade: Int!
+}
+
+type Ocorrencia {
+  versao: Int!
+  id: ID!
+  centralId: ID!
+  descricao: String!
+  enderecoFormatado: String!
+  bairro: String
+  cep: String
+  referencia: String
+  origemLocalizacao: String!
+  precisaoLocalizacao: String!
+  eventos: [EventoOcorrencia!]!
+  tipo: String!
+  prioridade: Int!
+  latitude: Float!
+  longitude: Float!
+  status: String!
+  viaturaId: ID
+  viatura: Viatura
+  criadoEm: String!
+  atualizadoEm: String!
+}
+
+type PrevisaoDespacho {
+  calculadoEm: String!
+  viaturaCandidataId: ID
+  distanciaMetros: Float
+  duracaoViariaSegundos: Float
+  origemEstimativa: String!
+  qualidadeEstimativa: String!
+}
+
+type Query {
+  me: Admin!
+  listarCentrais: [Central!]!
+  listarOcorrencias(status: String): [Ocorrencia!]!
+  consultarOcorrencia(id: ID!): Ocorrencia
+  preverDespacho(latitude: Float!, longitude: Float!): PrevisaoDespacho!
+  estatisticasViatura(id: ID!, dataLocal: String): EstatisticasViatura!
+  despachosViatura(id: ID!, cursor: ID, limit: Int): [Despacho!]!
+  listarViaturas(status: String): [Viatura!]!
+  consultarViatura(id: ID!): Viatura
+  listarDespachos: [Despacho!]!
+  estadoSimulacao: EstadoSimulacao!
+  consultarDespacho(id: ID!): Despacho
+}
+
+type Viatura {
+  id: ID!
+  codigo: Int!
+  placa: String!
+  status: String!
+  latitude: Float!
+  longitude: Float!
+  capacidade: Int!
+  versao: Int!
+  ultimoSinalEm: String
+  ultimaPosicaoEm: String
+  ultimoMovimentoEm: String
+  direcaoGraus: Float!
+  velocidadeMps: Float!
+  versaoPosicao: Int!
+  patrulhaRota: String
+  patrulhaProgresso: Float
+  operandoDesde: String
+  atualizadoEm: String!
+}

@@ -1,0 +1,84 @@
+name: Deploy · AWS us-east-1
+on:
+  workflow_dispatch:
+  push:
+    branches: [main]
+    paths:
+      - 'apps/**'
+      - 'packages/**'
+      - 'infra/docker/**'
+      - 'scripts/**'
+      - 'package.json'
+permissions:
+  id-token: write
+  contents: read
+concurrency: {group: sdv-production, cancel-in-progress: false}
+jobs:
+  deploy:
+    runs-on: ubuntu-latest
+    # Primeiro provisionar RDS/ECS/segredos e publicar o OSRM em ECR.
+    env:
+      AWS_REGION: us-east-1
+      REPO_PREFIX: sdv
+      ECS_CLUSTER: sdv-cluster
+      AWS_ACCOUNT_ID: ${{ vars.AWS_ACCOUNT_ID }}
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-node@v4
+        with: {node-version: '22'}
+      - name: Valida parâmetros do ambiente
+        run: |
+          test -n "${{ vars.AWS_ROLE_ARN }}"
+          test -n "${{ vars.AWS_ACCOUNT_ID }}"
+          test -n "${{ vars.FRONTEND_BUCKET }}"
+          test -n "${{ vars.CLOUDFRONT_DISTRIBUTION_ID }}"
+      - uses: aws-actions/configure-aws-credentials@v4
+        with:
+          role-to-assume: ${{ vars.AWS_ROLE_ARN }}
+          aws-region: us-east-1
+      - name: ECR login
+        id: ecr
+        uses: aws-actions/amazon-ecr-login@v2
+      - name: Publicar imagens com SHA imutável
+        shell: bash
+        run: |
+          set -euo pipefail
+          REGISTRY="${{ steps.ecr.outputs.registry }}"
+          declare -A APPS=([gateway]=gateway [ocorrencias]=ocorrencias-service [viaturas]=viaturas-service [worker]=dispatch-worker [simulador]=gps-simulator)
+          for SERVICE in "${!APPS[@]}"; do
+            IMAGE="$REGISTRY/$REPO_PREFIX/$SERVICE:$GITHUB_SHA"
+            if aws ecr describe-images --repository-name "$REPO_PREFIX/$SERVICE" --image-ids imageTag="$GITHUB_SHA" >/dev/null 2>&1; then
+              echo "Já publicada: $IMAGE"
+            else
+              docker build -f infra/docker/Dockerfile --build-arg SERVICE="${APPS[$SERVICE]}" -t "$IMAGE" .
+              docker push "$IMAGE"
+            fi
+          done
+      - name: Atualizar tarefas ECS (se provisionadas)
+        shell: bash
+        run: |
+          set -euo pipefail
+          for SERVICE in gateway ocorrencias viaturas worker simulador; do
+            NAME="$REPO_PREFIX-$SERVICE"
+            if ! aws ecs describe-services --cluster "$ECS_CLUSTER" --services "$NAME" --query 'services[0].status' --output text | grep -q ACTIVE; then
+              echo "ECS $NAME ainda não está provisionado; pulando."
+              continue
+            fi
+            TASK_ARN=$(aws ecs describe-services --cluster "$ECS_CLUSTER" --services "$NAME" --query 'services[0].taskDefinition' --output text)
+            aws ecs describe-task-definition --task-definition "$TASK_ARN" --query 'taskDefinition' > /tmp/old-task.json
+            jq --arg image "$AWS_ACCOUNT_ID.dkr.ecr.$AWS_REGION.amazonaws.com/$REPO_PREFIX/$SERVICE:$GITHUB_SHA" \
+              --arg name "$SERVICE" \
+              'del(.taskDefinitionArn,.revision,.status,.requiresAttributes,.compatibilities,.registeredAt,.registeredBy,.deregisteredAt) | .containerDefinitions |= map(if .name == $name then .image = $image else . end)' /tmp/old-task.json > /tmp/new-task.json
+            REVISION=$(aws ecs register-task-definition --cli-input-json file:///tmp/new-task.json --query 'taskDefinition.taskDefinitionArn' --output text)
+            aws ecs update-service --cluster "$ECS_CLUSTER" --service "$NAME" --task-definition "$REVISION" >/dev/null
+            aws ecs wait services-stable --cluster "$ECS_CLUSTER" --services "$NAME"
+            echo "Publicado $NAME: $GITHUB_SHA"
+          done
+      - name: Build do painel React
+        run: |
+          npm install --no-audit --no-fund
+          npm run build -w @sdv/frontend
+      - name: Publicar painel no S3/CloudFront
+        run: |
+          aws s3 sync apps/painel-frontend/dist "s3://${{ vars.FRONTEND_BUCKET }}" --delete
+          aws cloudfront create-invalidation --distribution-id "${{ vars.CLOUDFRONT_DISTRIBUTION_ID }}" --paths '/*'

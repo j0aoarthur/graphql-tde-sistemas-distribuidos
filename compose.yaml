@@ -1,0 +1,31 @@
+name: sdv
+services:
+  postgres:
+    image: postgres:16-alpine
+    restart: unless-stopped
+    environment:
+      POSTGRES_USER: sdv
+      POSTGRES_PASSWORD: sdv_dev_only
+      POSTGRES_DB: postgres
+    ports: ['127.0.0.1:5432:5432']
+    volumes:
+      - postgres_data:/var/lib/postgresql/data
+      - ./scripts/init-dbs.sh:/docker-entrypoint-initdb.d/01-init-dbs.sh:ro
+    healthcheck:
+      test: ['CMD-SHELL', 'pg_isready -U sdv -d postgres']
+      interval: 5s
+      retries: 12
+  redis:
+    image: redis:7-alpine
+    restart: unless-stopped
+    command: ['redis-server','--appendonly','yes']
+    ports: ['127.0.0.1:6379:6379']
+    volumes:
+      - redis_data:/data
+    healthcheck:
+      test: ['CMD','redis-cli','ping']
+      interval: 5s
+      retries: 12
+volumes:
+  postgres_data:
+  redis_data:

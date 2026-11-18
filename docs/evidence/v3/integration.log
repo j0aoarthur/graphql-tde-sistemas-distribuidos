@@ -1,0 +1,72 @@
+Trechos do job integration. Conclusão verificada: success.
+SHA: 16b5e4710a3d39d47e1dd8a06584f29238f2ffca
+Rodada: https://github.com/j0aoarthur/graphql-tde-sistemas-distribuidos/actions/runs/41976051692
+
+##[group]Run npm run db:generate && npm run db:migrate && npm run seed && npm run build
+> sdv-monorepo@0.1.0 db:generate
+> npm run db:generate -w @sdv/ocorrencias && npm run db:generate -w @sdv/viaturas
+> @sdv/ocorrencias@0.1.0 db:generate
+> prisma generate --schema prisma/schema.prisma
+✔ Generated Prisma Client (v6.19.0) to ./src/generated/client in 104ms
+> @sdv/viaturas@0.1.0 db:generate
+> prisma generate --schema prisma/schema.prisma
+✔ Generated Prisma Client (v6.19.0) to ./src/generated/client in 86ms
+> sdv-monorepo@0.1.0 db:migrate
+> npm run db:migrate -w @sdv/ocorrencias && npm run db:migrate -w @sdv/viaturas
+> @sdv/ocorrencias@0.1.0 db:migrate
+> prisma migrate deploy --schema prisma/schema.prisma
+> @sdv/viaturas@0.1.0 db:migrate
+> prisma migrate deploy --schema prisma/schema.prisma
+> sdv-monorepo@0.1.0 seed
+> tsx scripts/seed-demo.ts
+> sdv-monorepo@0.1.0 build
+> npm run build -w @sdv/gateway && npm run build -w @sdv/ocorrencias && npm run build -w @sdv/viaturas && npm run build -w @sdv/worker && npm run build -w @sdv/frontend && npm run build -w @sdv/simulator
+> @sdv/gateway@0.1.0 build
+> tsc -p tsconfig.json
+> @sdv/ocorrencias@0.1.0 build
+> tsc -p tsconfig.json && cp src/schema.graphql dist/schema.graphql && mkdir -p dist/generated/client && cp -R src/generated/client/. dist/generated/client/
+> @sdv/viaturas@0.1.0 build
+> tsc -p tsconfig.json && cp src/schema.graphql dist/schema.graphql && mkdir -p dist/generated/client && cp -R src/generated/client/. dist/generated/client/
+> @sdv/worker@0.1.0 build
+> tsc -p tsconfig.json
+> @sdv/frontend@0.1.0 build
+> tsc --noEmit && vite build
+✓ built in 5.17s
+> @sdv/simulator@0.2.0 build
+> tsc -p tsconfig.json
+##[group]Run node tests/fixtures/osrm.mjs > /tmp/osrm.log 2>&1 &
+##[group]Run npm run test:operations
+> sdv-monorepo@0.1.0 test:operations
+> node tests/operations.mjs && node tests/race.mjs && node tests/metrics.mjs
+PASSOU: prévia OSRM Table sem reserva, validação/metadata, idempotência, ETA real alocado, chegada canônica, replay auditável, heartbeat parado, autorização, encerramento, retomada da patrulha e estatísticas Bahia em PostgreSQL/Redis reais; OSRM usa fixture
+PASSOU: duas réplicas sobre o mesmo frame e replay não duplicam progresso nem versão no PostgreSQL
+PASSOU: fronteira 02:59/03:00 UTC em America/Bahia e distinção entre concluídos e cancelados e paginação por cursor via GraphQL/PostgreSQL
+##[group]Run node tests/gps.mjs
+PASSOU: perda de GPS congela coordenadas/versão, timeout distinto e heartbeat restaura estado canônico
+##[group]Run npm run test:concurrency
+> sdv-monorepo@0.1.0 test:concurrency
+> NODE_ENV=test node tests/concurrency.mjs
+PASSOU: duas centrais, concorrência GraphQL, nenhuma viatura duplicada [
+> sdv-monorepo@0.1.0 test:recovery
+> node tests/recovery.mjs
+PASSOU: crash AFTER_FLEET_COMMIT, pending recuperado e projeção convergente sem despacho duplicado
+PASSOU: crash BEFORE_ACK, pending recuperado e projeção convergente sem despacho duplicado
+##[group]Run npm run test:session
+> sdv-monorepo@0.1.0 test:session
+> node tests/session.mjs
+PASSOU: CSRF, login, cookie HttpOnly/Strict, rotação, token federado, conflito concorrente e revogação no PostgreSQL
+PASSOU: reutilização de token histórico revoga a família inteira da sessão
+[1/13] tests/accessibility.spec.ts:3:5 › contraste WCAG AA e texto funcional no workspace
+[2/13] tests/gps.spec.ts:2:5 › sinal atrasado congela marcador e informa o horário
+[3/13] tests/https.spec.ts:3:5 › cookie Secure e sessão após reload em proxy HTTPS local
+[4/13] tests/lifecycle.spec.ts:2:5 › ciclo completo na interface preserva chegada após F5 e retoma patrulha
+[5/13] tests/operations.spec.ts:8:6 › mapa, endereço, CEP, pin e confirmação 1366
+[6/13] tests/operations.spec.ts:8:6 › mapa, endereço, CEP, pin e confirmação 1440
+[7/13] tests/operations.spec.ts:8:6 › mapa, endereço, CEP, pin e confirmação 390
+[8/13] tests/operations.spec.ts:45:5 › falha de busca permite pin e referência; cancelar não cria ocorrência
+[9/13] tests/renderer.spec.ts:2:5 › renderizador interpola na curva sem cortar quarteirão
+[10/13] tests/scene.spec.ts:2:5 › três despachos, cores por status, seleção, tema, zoom estável e movimento reduzido
+[11/13] tests/session.spec.ts:3:5 › restaura sessão após F5, duas abas e revoga logout
+[12/13] tests/session.spec.ts:24:5 › renova uma vez após credencial HTTP expirada
+[13/13] tests/websocket.spec.ts:3:5 › expiração real do JWT fecha WS e restaura credencial sem logout
+  13 passed (1.4m)

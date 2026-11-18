@@ -1,0 +1,4 @@
+FROM ghcr.io/project-osrm/osrm-backend:latest
+COPY data/osrm/feira.osrm* /data/
+EXPOSE 5000
+CMD ["osrm-routed","--algorithm","mld","/data/feira.osrm"]

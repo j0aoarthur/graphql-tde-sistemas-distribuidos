@@ -1,0 +1,37 @@
+
+> sdv-monorepo@0.1.0 build
+> npm run build -w @sdv/gateway && npm run build -w @sdv/ocorrencias && npm run build -w @sdv/viaturas && npm run build -w @sdv/worker && npm run build -w @sdv/frontend && npm run build -w @sdv/simulator
+
+
+> @sdv/gateway@0.1.0 build
+> tsc -p tsconfig.json
+
+
+> @sdv/ocorrencias@0.1.0 build
+> tsc -p tsconfig.json && cp src/schema.graphql dist/schema.graphql && mkdir -p dist/generated && cp -R src/generated/client dist/generated/client
+
+
+> @sdv/viaturas@0.1.0 build
+> tsc -p tsconfig.json && cp src/schema.graphql dist/schema.graphql && mkdir -p dist/generated && cp -R src/generated/client dist/generated/client
+
+
+> @sdv/worker@0.1.0 build
+> tsc -p tsconfig.json
+
+
+> @sdv/frontend@0.1.0 build
+> tsc --noEmit && vite build
+
+vite v6.4.5 building for production...
+transforming...
+✓ 1760 modules transformed.
+rendering chunks...
+computing gzip size...
+dist/index.html                   0.63 kB │ gzip:   0.40 kB
+dist/assets/index-bMfzKBya.css   50.39 kB │ gzip:  15.10 kB
+dist/assets/index-BO8ovSDz.js   380.39 kB │ gzip: 113.86 kB
+✓ built in 2.39s
+
+> @sdv/simulator@0.2.0 build
+> tsc -p tsconfig.json
+
