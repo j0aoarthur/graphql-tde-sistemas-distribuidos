@@ -11,6 +11,7 @@
   },
   "scripts": {
     "test": "node --test tests/*.test.cjs",
+    "schema:export": "node scripts/export-schema.mjs",
     "dev:gateway": "npm run dev -w @sdv/gateway",
     "dev:ocorrencias": "npm run dev -w @sdv/ocorrencias",
     "dev:viaturas": "npm run dev -w @sdv/viaturas",

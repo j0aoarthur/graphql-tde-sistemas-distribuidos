@@ -49,6 +49,18 @@ infra/docker/             imagens de produção, nginx, OSRM
 
 **Nota:** em produção as migrations são obrigatórias. O antigo script `constraints.sql` é redundante após `prisma migrate deploy` porque o índice crítico já consta em migration SQL. Não execute `prisma db push` em produção.
 
+## Documentação da API (Swagger)
+
+A API principal é GraphQL; o schema completo fica em [`docs/schema.graphql`](docs/schema.graphql) e é regenerado com `npm run schema:export` (gateway no ar; `GRAPHQL_URL` se não estiver na porta 4000).
+
+A parte HTTP do gateway (login, renovação e saída de sessão, `/graphql` e `/health`) tem Swagger UI. Ele só liga em ambiente de desenvolvimento, com `SWAGGER_ENABLED=1` (nunca em produção):
+
+```bash
+SWAGGER_ENABLED=1 npm run dev:gateway   # http://localhost:4000/docs  (JSON em /openapi.json)
+```
+
+As rotas internas entre serviços não são documentadas. O contrato é validado por `tests/openapi.test.cjs`.
+
 ## Testes
 
 - `npm test` — valida ranking, coordenadas, versões, geometria e movimento físico sobre ruas OSRM gravadas.

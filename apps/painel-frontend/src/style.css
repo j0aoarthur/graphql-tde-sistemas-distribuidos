@@ -95,3 +95,6 @@ button:focus-visible,input:focus-visible,textarea:focus-visible,select:focus-vis
 .tl-tech>strong{font-weight:500!important;color:#475569!important}.tl-tech>i{background:#eef1f4!important;color:#475569!important}
 .tl-toggle{display:inline-flex;align-items:center;gap:6px;margin-top:16px;padding:6px 0;background:transparent;color:#1d4f88;font-size:13px;font-weight:600}
 .tl-toggle:hover{text-decoration:underline}
+
+/* Camadas do mapa: a viatura fica sempre acima do pin da ocorrência (o pin é ancorado pela base); a selecionada vence tudo. */
+.maplibregl-marker.incident-pin{z-index:2}.maplibregl-marker.vehicle-marker{z-index:3}.maplibregl-marker.vehicle-marker.selected{z-index:5}

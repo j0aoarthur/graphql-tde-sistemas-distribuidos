@@ -106,7 +106,6 @@
 :root[data-theme=dark] .tabs{background:#29333e}
 :root[data-theme=dark] .tabs button{color:#8ba1b1}
 :root[data-theme=dark] .tabs button.selected{background:#1d2934;color:#becfdb}
-:root[data-theme=dark] .fleet-hero-numbers{border-top:1px solid #282e3320}
 :root[data-theme=dark] .fleet-mini-map{border:1px solid #323a3f}
 :root[data-theme=dark] .table-progress{background:#1a252f}
 :root[data-theme=dark] .sim-speed{background:#27343a;border:1px solid #2f373c}

@@ -87,7 +87,7 @@ select.priority-select[data-level="5"]{background:var(--lv5-bg);color:var(--lv5)
 .dw{display:flex;flex-direction:column;background:var(--ux-surface);color:var(--ux-text)}
 .dw-top{display:flex;align-items:center;justify-content:space-between;padding:14px 20px;border-bottom:1px solid var(--ux-line)}
 .dw-body{flex:1;overflow:auto;padding:20px 20px 8px}
-.operational-sidebar .dw-body{padding:12px 0}.operational-sidebar .dw-top{padding:6px 0 10px}
+.operational-sidebar .dw-body{padding:12px 4px}.operational-sidebar .dw-top{padding:6px 4px 10px}
 .dw-hero{display:grid;grid-template-columns:auto minmax(0,1fr);gap:4px 14px;align-items:center}
 .dw-hero-icon{width:46px;height:46px;border-radius:12px;display:grid;place-items:center;background:var(--ux-info-bg);color:var(--ux-info);grid-row:span 1}
 .dw-hero-icon--vehicle{background:var(--ux-ok-bg);color:var(--ux-ok)}.dw-hero-icon--dispatch{background:var(--ux-warn-bg);color:var(--ux-warn)}
@@ -122,7 +122,7 @@ select.priority-select[data-level="5"]{background:var(--lv5-bg);color:var(--lv5)
 .dw-tech summary::-webkit-details-marker{display:none}.dw-tech summary svg{transition:transform .15s}.dw-tech[open] summary svg{transform:rotate(180deg)}
 .dw-tech>div{margin-top:12px}
 .dw-actions{position:sticky;bottom:0;display:grid;gap:8px;padding:14px 20px;border-top:1px solid var(--ux-line);background:var(--ux-surface)}
-.operational-sidebar .dw-actions{padding:14px 0}
+.operational-sidebar .dw-actions{padding:14px 4px}
 .dw-skeleton{height:64px;border-radius:12px;background:linear-gradient(90deg,var(--ux-surface-2),var(--ux-surface-3),var(--ux-surface-2));background-size:200% 100%;animation:dwshine 1.4s linear infinite}.dw-skeleton--short{height:40px;width:60%}
 @keyframes dwshine{to{background-position:-200% 0}}
 .dw-caption{display:block;font-size:13px;color:var(--ux-text-2);margin-bottom:4px}
@@ -186,3 +186,17 @@ select.priority-select[data-level="5"]{background:var(--lv5-bg);color:var(--lv5)
 
 /* Diálogos (confirmação, cadastro) sempre acima do drawer lateral, que usa o mesmo z-index base. */
 .modal-backdrop{z-index:1100}
+
+/* Drawer embutido na Central operacional: sem retângulo próprio (usa o fundo do painel) e com respiro lateral,
+   para o texto não encostar na borda de um fundo diferente (visível no tema escuro). */
+.operational-sidebar .detail-panel.dw{background:transparent;color:var(--ux-text)}
+.operational-sidebar .dw-hero{padding-left:4px;padding-right:4px}
+
+/* Bloco "Controle de recursos" (Viaturas): segue o tema em vez de gradiente azul fixo. */
+.fleet-hero{background:linear-gradient(125deg,var(--ux-surface),var(--ux-surface-2));color:var(--ux-text);border:1px solid var(--ux-line);border-radius:10px;box-shadow:var(--ux-shadow)}
+.fleet-hero .eyebrow{color:var(--ux-bad)}
+.fleet-hero h2{color:var(--ux-text)}
+.fleet-hero p{color:var(--ux-text-2)}
+.fleet-hero-numbers{border-top:1px solid var(--ux-line)}
+.fleet-hero-numbers strong{color:var(--ux-text)}
+.fleet-hero-numbers span{color:var(--ux-text-2)}

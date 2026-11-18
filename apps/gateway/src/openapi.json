@@ -1,0 +1,618 @@
+{
+  "openapi": "3.0.3",
+  "info": {
+    "title": "SDV — API HTTP do gateway",
+    "version": "0.1.0",
+    "description": "Simulação acadêmica de despacho de viaturas (Feira de Santana, BA). **Não é um sistema de despacho real.**\n\nA API principal é **GraphQL** (`POST /graphql`, Apollo Federation); o schema completo está em `docs/schema.graphql` (`npm run schema:export`). Esta página documenta **todas as rotas HTTP do sistema**: as públicas do gateway (sessão, `/graphql`, `/subscriptions`, `/health`) e as **internas entre serviços** (tag *Interno*), protegidas por token compartilhado.\n\n**Portas padrão em desenvolvimento:** gateway `:4000` · ocorrências `:4001` · viaturas `:4002`. Subgraphs: `ocorrencias :4001/graphql` e `viaturas :4002/graphql` (mesmo contrato de `/graphql`, usados só pelo gateway). `/health` existe também em ocorrências e viaturas. `/auth/*` no gateway é um proxy do serviço de ocorrências (mesmo contrato).\n\n**Try it out:** as rotas do gateway funcionam direto desta página. As rotas *Interno* ficam em outra porta (outra origem) e o navegador as bloqueia por CORS — use `curl` (exemplos nas descrições). Esta documentação só existe em desenvolvimento (`SWAGGER_ENABLED=1`)."
+  },
+  "servers": [
+    {
+      "url": "/",
+      "description": "Gateway (mesma origem)"
+    }
+  ],
+  "tags": [
+    {
+      "name": "Sessão",
+      "description": "Autenticação de administradores das centrais (JWT de acesso de 15 min + cookie de renovação HttpOnly)."
+    },
+    {
+      "name": "GraphQL",
+      "description": "Todas as operações de ocorrências e viaturas."
+    },
+    {
+      "name": "Saúde",
+      "description": "Verificação de disponibilidade."
+    },
+    {
+      "name": "Interno",
+      "description": "Comandos servidor-a-servidor (dispatch-worker → viaturas-service). Exigem o cabeçalho `x-internal-token` (variável `INTERNAL_SERVICE_TOKEN`). Nunca exponha estas rotas na internet."
+    },
+    {
+      "name": "Documentação",
+      "description": "Esta própria documentação (somente desenvolvimento)."
+    }
+  ],
+  "paths": {
+    "/auth/login": {
+      "post": {
+        "tags": [
+          "Sessão"
+        ],
+        "summary": "Entrar",
+        "description": "Valida e-mail e senha de um administrador (contas criadas por seed). Devolve o token de acesso e grava o cookie `sdv_refresh` (HttpOnly, SameSite=Strict, 7 dias). Limitado a 20 tentativas por minuto por IP e e-mail.\n\n**Origem:** o serviço valida `Origin` contra `FRONTEND_ORIGIN`. Chamado por esta página (mesma origem do gateway, só em desenvolvimento) o gateway a trata como a origem do painel.",
+        "parameters": [
+          {
+            "$ref": "#/components/parameters/CsrfHeader"
+          }
+        ],
+        "requestBody": {
+          "required": true,
+          "content": {
+            "application/json": {
+              "schema": {
+                "$ref": "#/components/schemas/LoginRequest"
+              },
+              "example": {
+                "email": "central-a@sdv.local",
+                "senha": "<senha definida no seed>"
+              }
+            }
+          }
+        },
+        "responses": {
+          "200": {
+            "description": "Sessão criada.",
+            "headers": {
+              "Set-Cookie": {
+                "$ref": "#/components/headers/SetRefreshCookie"
+              }
+            },
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/TokenResponse"
+                }
+              }
+            }
+          },
+          "400": {
+            "$ref": "#/components/responses/Erro"
+          },
+          "401": {
+            "$ref": "#/components/responses/Erro"
+          },
+          "403": {
+            "$ref": "#/components/responses/Erro"
+          },
+          "429": {
+            "$ref": "#/components/responses/Erro"
+          }
+        }
+      }
+    },
+    "/auth/refresh": {
+      "post": {
+        "tags": [
+          "Sessão"
+        ],
+        "summary": "Renovar o token de acesso",
+        "description": "Usa o cookie `sdv_refresh` para emitir um novo token de acesso e rotacionar o cookie. Chamado ao recarregar a página.",
+        "security": [
+          {
+            "cookieAuth": []
+          }
+        ],
+        "parameters": [
+          {
+            "$ref": "#/components/parameters/CsrfHeader"
+          }
+        ],
+        "requestBody": {
+          "required": false,
+          "content": {
+            "application/json": {
+              "schema": {
+                "type": "object"
+              }
+            }
+          }
+        },
+        "responses": {
+          "200": {
+            "description": "Novo token de acesso.",
+            "headers": {
+              "Set-Cookie": {
+                "$ref": "#/components/headers/SetRefreshCookie"
+              }
+            },
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/TokenResponse"
+                }
+              }
+            }
+          },
+          "401": {
+            "$ref": "#/components/responses/Erro"
+          },
+          "403": {
+            "$ref": "#/components/responses/Erro"
+          }
+        }
+      }
+    },
+    "/auth/logout": {
+      "post": {
+        "tags": [
+          "Sessão"
+        ],
+        "summary": "Sair",
+        "description": "Revoga a sessão e limpa o cookie de renovação.",
+        "security": [
+          {
+            "cookieAuth": []
+          }
+        ],
+        "parameters": [
+          {
+            "$ref": "#/components/parameters/CsrfHeader"
+          }
+        ],
+        "requestBody": {
+          "required": false,
+          "content": {
+            "application/json": {
+              "schema": {
+                "type": "object"
+              }
+            }
+          }
+        },
+        "responses": {
+          "200": {
+            "description": "Sessão encerrada.",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "type": "object",
+                  "properties": {
+                    "ok": {
+                      "type": "boolean",
+                      "example": true
+                    }
+                  }
+                }
+              }
+            }
+          },
+          "403": {
+            "$ref": "#/components/responses/Erro"
+          }
+        }
+      }
+    },
+    "/graphql": {
+      "post": {
+        "tags": [
+          "GraphQL"
+        ],
+        "summary": "Executar uma operação GraphQL",
+        "description": "Queries e mutations de ocorrências e viaturas (ex.: `listarOcorrencias`, `abrirOcorrencia`, `listarViaturas`). Requer `Authorization: Bearer <accessToken>`. Subscriptions usam WebSocket em `/subscriptions` (graphql-ws).",
+        "security": [
+          {
+            "bearerAuth": []
+          }
+        ],
+        "requestBody": {
+          "required": true,
+          "content": {
+            "application/json": {
+              "schema": {
+                "$ref": "#/components/schemas/GraphQLRequest"
+              },
+              "example": {
+                "query": "query { listarViaturas { id codigo placa status } }"
+              }
+            }
+          }
+        },
+        "responses": {
+          "200": {
+            "description": "Resultado (pode conter `errors` mesmo com HTTP 200, conforme o protocolo GraphQL).",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "type": "object",
+                  "properties": {
+                    "data": {
+                      "type": "object",
+                      "nullable": true
+                    },
+                    "errors": {
+                      "type": "array",
+                      "items": {
+                        "type": "object"
+                      }
+                    }
+                  }
+                }
+              }
+            }
+          },
+          "400": {
+            "description": "Operação inválida."
+          }
+        }
+      }
+    },
+    "/health": {
+      "get": {
+        "tags": [
+          "Saúde"
+        ],
+        "summary": "Verificar o gateway",
+        "responses": {
+          "200": {
+            "description": "Gateway no ar.",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "type": "object",
+                  "properties": {
+                    "status": {
+                      "type": "string",
+                      "example": "ok"
+                    },
+                    "service": {
+                      "type": "string",
+                      "example": "gateway"
+                    }
+                  }
+                }
+              }
+            }
+          }
+        },
+        "description": "Também existe em ocorrências (`:4001/health`) e viaturas (`:4002/health`), com resposta `{\"status\":\"ok\"}`."
+      }
+    },
+    "/internal/dispatch": {
+      "post": {
+        "tags": [
+          "Interno"
+        ],
+        "summary": "Alocar a viatura livre mais próxima",
+        "servers": [
+          {
+            "url": "http://localhost:4002",
+            "description": "viaturas-service (porta padrão)"
+          }
+        ],
+        "description": "Escolhe a viatura **livre mais próxima** do ponto e a confirma de forma atômica (lock no Redis como otimização; **UPDATE condicional + índice único no PostgreSQL são a garantia**). Idempotente por `ocorrenciaId` (consumo at-least-once do worker).\n\n```bash\ncurl -X POST http://localhost:4002/internal/dispatch -H 'content-type: application/json' -H \"x-internal-token: $INTERNAL_SERVICE_TOKEN\" -d '{\"ocorrenciaId\":\"<uuid>\",\"latitude\":-12.2664,\"longitude\":-38.9663}'\n```",
+        "security": [
+          {
+            "internalToken": []
+          }
+        ],
+        "requestBody": {
+          "required": true,
+          "content": {
+            "application/json": {
+              "schema": {
+                "$ref": "#/components/schemas/DispatchRequest"
+              }
+            }
+          }
+        },
+        "responses": {
+          "201": {
+            "description": "Resultado da alocação.",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/DispatchResult"
+                }
+              }
+            }
+          },
+          "400": {
+            "description": "Dados inválidos (UUID ou coordenadas)."
+          },
+          "401": {
+            "description": "Token interno ausente ou incorreto."
+          }
+        }
+      }
+    },
+    "/internal/finish": {
+      "post": {
+        "tags": [
+          "Interno"
+        ],
+        "summary": "Finalizar o despacho (concluir ou cancelar) e liberar a viatura",
+        "servers": [
+          {
+            "url": "http://localhost:4002",
+            "description": "viaturas-service (porta padrão)"
+          }
+        ],
+        "description": "Marca o despacho como concluído/cancelado e devolve a viatura à patrulha. Idempotente.\n\n```bash\ncurl -X POST http://localhost:4002/internal/finish -H 'content-type: application/json' -H \"x-internal-token: $INTERNAL_SERVICE_TOKEN\" -d '{\"ocorrenciaId\":\"<uuid>\",\"acao\":\"CANCELADO\"}'\n```",
+        "security": [
+          {
+            "internalToken": []
+          }
+        ],
+        "requestBody": {
+          "required": true,
+          "content": {
+            "application/json": {
+              "schema": {
+                "$ref": "#/components/schemas/FinishRequest"
+              }
+            }
+          }
+        },
+        "responses": {
+          "201": {
+            "description": "Resultado.",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/FinishResult"
+                }
+              }
+            }
+          },
+          "400": {
+            "description": "Dados inválidos."
+          },
+          "401": {
+            "description": "Token interno ausente ou incorreto."
+          }
+        }
+      }
+    },
+    "/subscriptions": {
+      "get": {
+        "tags": [
+          "GraphQL"
+        ],
+        "summary": "Assinaturas em tempo real (WebSocket, graphql-ws)",
+        "description": "Upgrade para WebSocket (protocolo `graphql-transport-ws`). O token de acesso vai em `connectionParams.authorization` (`Bearer <accessToken>`); apenas administradores, e a conexão cai (código 4403) quando a credencial expira. Subscription disponível: `eventoSDV { tipo entidadeId timestamp }`. O cliente deve buscar o estado via GraphQL após reconectar (Pub/Sub é transitório). Não testável pelo Swagger UI.",
+        "responses": {
+          "101": {
+            "description": "Switching Protocols (WebSocket)."
+          },
+          "403": {
+            "description": "Credencial inválida."
+          }
+        }
+      }
+    },
+    "/openapi.json": {
+      "get": {
+        "tags": [
+          "Documentação"
+        ],
+        "summary": "Este documento OpenAPI",
+        "responses": {
+          "200": {
+            "description": "OpenAPI 3.0.3 (JSON).",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "type": "object"
+                }
+              }
+            }
+          }
+        }
+      }
+    }
+  },
+  "components": {
+    "securitySchemes": {
+      "bearerAuth": {
+        "type": "http",
+        "scheme": "bearer",
+        "bearerFormat": "JWT",
+        "description": "Token de acesso (HS256, 15 min) obtido em /auth/login ou /auth/refresh."
+      },
+      "cookieAuth": {
+        "type": "apiKey",
+        "in": "cookie",
+        "name": "sdv_refresh",
+        "description": "Cookie HttpOnly de renovação (não acessível por JavaScript)."
+      },
+      "internalToken": {
+        "type": "apiKey",
+        "in": "header",
+        "name": "x-internal-token",
+        "description": "Token compartilhado entre serviços (INTERNAL_SERVICE_TOKEN). Não use valores reais em exemplos."
+      }
+    },
+    "parameters": {
+      "CsrfHeader": {
+        "name": "x-sdv-csrf",
+        "in": "header",
+        "required": true,
+        "description": "Proteção CSRF: deve ser exatamente `1`. O corpo precisa ser `application/json`.",
+        "schema": {
+          "type": "string",
+          "enum": [
+            "1"
+          ]
+        }
+      }
+    },
+    "headers": {
+      "SetRefreshCookie": {
+        "description": "Cookie de renovação `sdv_refresh` (HttpOnly; SameSite=Strict; Path=/auth).",
+        "schema": {
+          "type": "string"
+        }
+      }
+    },
+    "schemas": {
+      "LoginRequest": {
+        "type": "object",
+        "required": [
+          "email",
+          "senha"
+        ],
+        "properties": {
+          "email": {
+            "type": "string",
+            "maxLength": 255,
+            "example": "central-a@sdv.local"
+          },
+          "senha": {
+            "type": "string",
+            "maxLength": 256,
+            "format": "password"
+          }
+        }
+      },
+      "TokenResponse": {
+        "type": "object",
+        "required": [
+          "accessToken"
+        ],
+        "properties": {
+          "accessToken": {
+            "type": "string",
+            "description": "JWT de acesso (15 min)."
+          }
+        }
+      },
+      "GraphQLRequest": {
+        "type": "object",
+        "required": [
+          "query"
+        ],
+        "properties": {
+          "query": {
+            "type": "string"
+          },
+          "variables": {
+            "type": "object",
+            "additionalProperties": true
+          },
+          "operationName": {
+            "type": "string"
+          }
+        }
+      },
+      "Erro": {
+        "type": "object",
+        "required": [
+          "error"
+        ],
+        "properties": {
+          "error": {
+            "type": "string",
+            "example": "Credenciais inválidas"
+          }
+        }
+      },
+      "DispatchRequest": {
+        "type": "object",
+        "required": [
+          "ocorrenciaId",
+          "latitude",
+          "longitude"
+        ],
+        "properties": {
+          "ocorrenciaId": {
+            "type": "string",
+            "format": "uuid"
+          },
+          "latitude": {
+            "type": "number",
+            "example": -12.2664
+          },
+          "longitude": {
+            "type": "number",
+            "example": -38.9663
+          }
+        }
+      },
+      "DispatchResult": {
+        "type": "object",
+        "required": [
+          "status"
+        ],
+        "properties": {
+          "status": {
+            "type": "string",
+            "enum": [
+              "DESPACHADA",
+              "SEM_VIATURA",
+              "CANCELADO"
+            ],
+            "description": "DESPACHADA: viatura alocada (idempotente por ocorrência). SEM_VIATURA: nenhuma livre, a ocorrência fica aguardando."
+          },
+          "viaturaId": {
+            "type": "string",
+            "format": "uuid"
+          },
+          "despachoId": {
+            "type": "string",
+            "format": "uuid"
+          }
+        }
+      },
+      "FinishRequest": {
+        "type": "object",
+        "required": [
+          "ocorrenciaId",
+          "acao"
+        ],
+        "properties": {
+          "ocorrenciaId": {
+            "type": "string",
+            "format": "uuid"
+          },
+          "acao": {
+            "type": "string",
+            "enum": [
+              "CONCLUIDO",
+              "CANCELADO"
+            ]
+          }
+        }
+      },
+      "FinishResult": {
+        "type": "object",
+        "required": [
+          "status"
+        ],
+        "properties": {
+          "status": {
+            "type": "string",
+            "enum": [
+              "CONCLUIDO",
+              "CANCELADO",
+              "SEM_DESPACHO"
+            ],
+            "description": "SEM_DESPACHO: a ocorrência nunca recebeu viatura."
+          }
+        }
+      }
+    },
+    "responses": {
+      "Erro": {
+        "description": "Erro (mensagem em português, sem detalhes internos).",
+        "content": {
+          "application/json": {
+            "schema": {
+              "$ref": "#/components/schemas/Erro"
+            }
+          }
+        }
+      }
+    }
+  }
+}
