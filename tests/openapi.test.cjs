@@ -1,9 +1,17 @@
 const {test}=require('node:test');const assert=require('node:assert/strict');const fs=require('node:fs');
 const doc=JSON.parse(fs.readFileSync('apps/gateway/src/openapi.json','utf8'));
 const gateway=fs.readFileSync('apps/gateway/src/main.ts','utf8');
-test('OpenAPI documenta só a superfície pública do gateway',()=>{
- assert.deepEqual(Object.keys(doc.paths).sort(),['/auth/login','/auth/logout','/auth/refresh','/graphql','/health']);
- assert.ok(!JSON.stringify(doc).includes('/internal'),'rotas internas não podem aparecer na documentação');
+const viaturas=fs.readFileSync('apps/viaturas-service/src/main.ts','utf8');
+test('OpenAPI documenta todas as rotas HTTP: públicas do gateway e internas entre serviços',()=>{
+ assert.deepEqual(Object.keys(doc.paths).sort(),['/auth/login','/auth/logout','/auth/refresh','/graphql','/health','/internal/dispatch','/internal/finish','/openapi.json','/subscriptions']);
+});
+test('rotas internas documentadas são exatamente as do InternalController e exigem o token',()=>{
+ const ctrl=/@Controller\('internal'\)[\s\S]*?\n\}/.exec(viaturas);assert.ok(ctrl,'InternalController não encontrado');
+ const real=[...ctrl[0].matchAll(/@Post\('(\w+)'\)/g)].map(m=>'/internal/'+m[1]).sort();
+ const documented=Object.keys(doc.paths).filter(p=>p.startsWith('/internal')).sort();
+ assert.deepEqual(documented,real);
+ for(const p of documented){const op=doc.paths[p].post;assert.deepEqual(op.security,[{internalToken:[]}],p);assert.ok(op.responses['401'],`${p} documenta 401`);assert.ok(op.tags.includes('Interno'));}
+ assert.equal(doc.components.securitySchemes.internalToken.name,'x-internal-token');
 });
 test('rotas /auth documentadas são exatamente as que o gateway encaminha',()=>{
  const allowed=/\[('\/auth\/[a-z]+'(?:,\s*)?)+\]\.includes\(url\.pathname\)/.exec(gateway);
