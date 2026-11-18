@@ -11,15 +11,14 @@ Regras do projeto (AGENTS.md) valem aqui: PRs pequenos e testados; nenhum crité
 
 | # | Item | Tipo | Esforço | Estado |
 |---|------|------|---------|--------|
-| 4 | Ações do drawer devem sobrepor o drawer | Bug de UI | P | **Corrigido** em `3bc9e18`; falta teste dedicado |
-| 5 | Tema escuro: fundo e fonte no drawer | Bug de UI | P | A fazer |
-| 7 | "CONTROLE DE RECURSOS" não muda com o tema | Bug de UI | P | A fazer |
-| 3 | Viatura abaixo do indicador da ocorrência | Bug de UI (mapa) | P | A fazer |
-| 6 | Novos ícones de viatura | Design | M | A fazer (opções abaixo) |
-| 1 | Swagger | Documentação/API | M | A fazer |
-| 2 | Rodar o barema no código | Entrega | M | **Bloqueado**: barema não está no repositório |
+| 4 | Ações do drawer devem sobrepor o drawer | Bug de UI | P | **Feito** (correção + teste `camadas-tema.spec.ts`) |
+| 5 | Tema escuro: fundo e fonte no drawer | Bug de UI | P | **Feito** |
+| 7 | "CONTROLE DE RECURSOS" não muda com o tema | Bug de UI | P | **Feito** |
+| 3 | Viatura abaixo do indicador da ocorrência | Bug de UI (mapa) | P | **Feito** |
+| 6 | Novos ícones de viatura | Design | M | **Feito** — opção **A** (sedã refinado) escolhida |
+| 1 | Swagger | Documentação/API | M | **Feito** |
 
-Fatiamento: PR A = itens 4+5+7 (temas e camadas de UI, com teste visual nos dois temas); PR B = item 3 + 6 (mapa e ícones); PR C = item 1 (Swagger); item 2 após receber o barema.
+Entrega: **um único PR** com todos os itens (decisão do responsável).
 
 ---
 
@@ -30,10 +29,6 @@ Fatiamento: PR A = itens 4+5+7 (temas e camadas de UI, com teste visual nos dois
 - **Não** documentar `/internal/*` (superfície interna, token compartilhado).
 - Para GraphQL, o equivalente é o schema: `npm run schema:export` gera o SDL federado em `docs/schema.graphql`, e o Apollo Sandbox já existe fora de produção.
 **Aceite.** `/docs` lista os 4 endpoints com exemplos sem segredos; teste de contrato garante que as rotas documentadas existem e que `/internal/*` não aparece; build e lint verdes.
-
-## 2. Rodar o barema no código
-**Bloqueio.** O barema (rubrica da disciplina) não está no repositório. Preciso do arquivo/texto.
-**Proposta.** Matriz critério → onde está implementado → teste/evidência → **PASSOU / FALHOU / BLOQUEADO** (formato do AGENTS.md), em `docs/BAREMA_RESULTADOS.md`, reaproveitando `docs/evidence/` e os testes existentes (`test:concurrency`, `test:recovery`, Playwright). Critério sem teste executável é registrado como lacuna, não como aprovado.
 
 ## 3. Viatura fica abaixo do indicador da ocorrência
 **Hipótese.** Marcadores do MapLibre são elementos DOM; a ordem de empilhamento sai da ordem de criação/latitude. O pin da ocorrência cobre a viatura quando chega ao local.

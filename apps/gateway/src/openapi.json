@@ -1,0 +1,108 @@
+{
+  "openapi": "3.0.3",
+  "info": {
+    "title": "SDV — API HTTP do gateway",
+    "version": "0.1.0",
+    "description": "Simulação acadêmica de despacho de viaturas (Feira de Santana, BA). **Não é um sistema de despacho real.**\n\nA API principal é **GraphQL** (`POST /graphql`, Apollo Federation) e o schema completo está em `docs/schema.graphql` (`npm run schema:export`). Esta página documenta a parte HTTP/REST do gateway: sessão (login, renovação e saída), health e o ponto de entrada GraphQL.\n\nAs rotas de comunicação interna entre serviços não fazem parte da API pública e não são documentadas."
+  },
+  "servers": [{ "url": "/", "description": "Gateway (mesma origem)" }],
+  "tags": [
+    { "name": "Sessão", "description": "Autenticação de administradores das centrais (JWT de acesso de 15 min + cookie de renovação HttpOnly)." },
+    { "name": "GraphQL", "description": "Todas as operações de ocorrências e viaturas." },
+    { "name": "Saúde", "description": "Verificação de disponibilidade." }
+  ],
+  "paths": {
+    "/auth/login": {
+      "post": {
+        "tags": ["Sessão"],
+        "summary": "Entrar",
+        "description": "Valida e-mail e senha de um administrador (contas criadas por seed). Devolve o token de acesso e grava o cookie `sdv_refresh` (HttpOnly, SameSite=Strict, 7 dias). Limitado a 20 tentativas por minuto por IP e e-mail.",
+        "parameters": [{ "$ref": "#/components/parameters/CsrfHeader" }],
+        "requestBody": {
+          "required": true,
+          "content": { "application/json": { "schema": { "$ref": "#/components/schemas/LoginRequest" }, "example": { "email": "central-a@sdv.local", "senha": "<senha definida no seed>" } } }
+        },
+        "responses": {
+          "200": { "description": "Sessão criada.", "headers": { "Set-Cookie": { "$ref": "#/components/headers/SetRefreshCookie" } }, "content": { "application/json": { "schema": { "$ref": "#/components/schemas/TokenResponse" } } } },
+          "400": { "$ref": "#/components/responses/Erro" },
+          "401": { "$ref": "#/components/responses/Erro" },
+          "403": { "$ref": "#/components/responses/Erro" },
+          "429": { "$ref": "#/components/responses/Erro" }
+        }
+      }
+    },
+    "/auth/refresh": {
+      "post": {
+        "tags": ["Sessão"],
+        "summary": "Renovar o token de acesso",
+        "description": "Usa o cookie `sdv_refresh` para emitir um novo token de acesso e rotacionar o cookie. Chamado ao recarregar a página.",
+        "security": [{ "cookieAuth": [] }],
+        "parameters": [{ "$ref": "#/components/parameters/CsrfHeader" }],
+        "requestBody": { "required": false, "content": { "application/json": { "schema": { "type": "object" } } } },
+        "responses": {
+          "200": { "description": "Novo token de acesso.", "headers": { "Set-Cookie": { "$ref": "#/components/headers/SetRefreshCookie" } }, "content": { "application/json": { "schema": { "$ref": "#/components/schemas/TokenResponse" } } } },
+          "401": { "$ref": "#/components/responses/Erro" },
+          "403": { "$ref": "#/components/responses/Erro" }
+        }
+      }
+    },
+    "/auth/logout": {
+      "post": {
+        "tags": ["Sessão"],
+        "summary": "Sair",
+        "description": "Revoga a sessão e limpa o cookie de renovação.",
+        "security": [{ "cookieAuth": [] }],
+        "parameters": [{ "$ref": "#/components/parameters/CsrfHeader" }],
+        "requestBody": { "required": false, "content": { "application/json": { "schema": { "type": "object" } } } },
+        "responses": {
+          "200": { "description": "Sessão encerrada.", "content": { "application/json": { "schema": { "type": "object", "properties": { "ok": { "type": "boolean", "example": true } } } } } },
+          "403": { "$ref": "#/components/responses/Erro" }
+        }
+      }
+    },
+    "/graphql": {
+      "post": {
+        "tags": ["GraphQL"],
+        "summary": "Executar uma operação GraphQL",
+        "description": "Queries e mutations de ocorrências e viaturas (ex.: `listarOcorrencias`, `abrirOcorrencia`, `listarViaturas`). Requer `Authorization: Bearer <accessToken>`. Subscriptions usam WebSocket em `/subscriptions` (graphql-ws).",
+        "security": [{ "bearerAuth": [] }],
+        "requestBody": {
+          "required": true,
+          "content": { "application/json": { "schema": { "$ref": "#/components/schemas/GraphQLRequest" }, "example": { "query": "query { listarViaturas { id codigo placa status } }" } } }
+        },
+        "responses": {
+          "200": { "description": "Resultado (pode conter `errors` mesmo com HTTP 200, conforme o protocolo GraphQL).", "content": { "application/json": { "schema": { "type": "object", "properties": { "data": { "type": "object", "nullable": true }, "errors": { "type": "array", "items": { "type": "object" } } } } } } },
+          "400": { "description": "Operação inválida." }
+        }
+      }
+    },
+    "/health": {
+      "get": {
+        "tags": ["Saúde"],
+        "summary": "Verificar o gateway",
+        "responses": { "200": { "description": "Gateway no ar.", "content": { "application/json": { "schema": { "type": "object", "properties": { "status": { "type": "string", "example": "ok" }, "service": { "type": "string", "example": "gateway" } } } } } } }
+      }
+    }
+  },
+  "components": {
+    "securitySchemes": {
+      "bearerAuth": { "type": "http", "scheme": "bearer", "bearerFormat": "JWT", "description": "Token de acesso (HS256, 15 min) obtido em /auth/login ou /auth/refresh." },
+      "cookieAuth": { "type": "apiKey", "in": "cookie", "name": "sdv_refresh", "description": "Cookie HttpOnly de renovação (não acessível por JavaScript)." }
+    },
+    "parameters": {
+      "CsrfHeader": { "name": "x-sdv-csrf", "in": "header", "required": true, "description": "Proteção CSRF: deve ser exatamente `1`. O corpo precisa ser `application/json`.", "schema": { "type": "string", "enum": ["1"] } }
+    },
+    "headers": {
+      "SetRefreshCookie": { "description": "Cookie de renovação `sdv_refresh` (HttpOnly; SameSite=Strict; Path=/auth).", "schema": { "type": "string" } }
+    },
+    "schemas": {
+      "LoginRequest": { "type": "object", "required": ["email", "senha"], "properties": { "email": { "type": "string", "maxLength": 255, "example": "central-a@sdv.local" }, "senha": { "type": "string", "maxLength": 256, "format": "password" } } },
+      "TokenResponse": { "type": "object", "required": ["accessToken"], "properties": { "accessToken": { "type": "string", "description": "JWT de acesso (15 min)." } } },
+      "GraphQLRequest": { "type": "object", "required": ["query"], "properties": { "query": { "type": "string" }, "variables": { "type": "object", "additionalProperties": true }, "operationName": { "type": "string" } } },
+      "Erro": { "type": "object", "required": ["error"], "properties": { "error": { "type": "string", "example": "Credenciais inválidas" } } }
+    },
+    "responses": {
+      "Erro": { "description": "Erro (mensagem em português, sem detalhes internos).", "content": { "application/json": { "schema": { "$ref": "#/components/schemas/Erro" } } } }
+    }
+  }
+}

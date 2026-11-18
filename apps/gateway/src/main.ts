@@ -9,6 +9,8 @@ import { WebSocketServer } from 'ws';
 import { useServer } from 'graphql-ws/lib/use/ws';
 import Redis from 'ioredis';
 import * as jwt from 'jsonwebtoken';
+import { readFileSync } from 'node:fs';
+import { join } from 'node:path';
 @Controller('health') class HealthController{@Get() ok(){return {status:'ok',service:'gateway'};}}
 @Module({imports:[GraphQLModule.forRoot<ApolloGatewayDriverConfig>({
   driver:ApolloGatewayDriver,
@@ -43,6 +45,14 @@ async function bootstrap(){
   const app=await NestFactory.create(AppModule);
   const express=app.getHttpAdapter().getInstance();
   express.use(require('express').json({limit:'16kb'}));
+  // Documentação da API HTTP (Swagger UI). Só com SWAGGER_ENABLED=1 e nunca em produção; não lista /internal/*.
+  if(process.env.SWAGGER_ENABLED==='1'&&process.env.NODE_ENV!=='production'){
+    const openapi=JSON.parse(readFileSync(join(__dirname,'openapi.json'),'utf8'));
+    express.get('/openapi.json',(_req:any,res:any)=>res.json(openapi));
+    express.use('/docs/assets',require('express').static(require('swagger-ui-dist').getAbsoluteFSPath()));
+    express.get('/docs/init.js',(_req:any,res:any)=>res.type('js').send("window.ui=SwaggerUIBundle({url:'/openapi.json',dom_id:'#swagger-ui',deepLinking:true});"));
+    express.get('/docs',(_req:any,res:any)=>res.type('html').send('<!doctype html><html lang="pt-BR"><head><meta charset="utf-8"><meta name="viewport" content="width=device-width,initial-scale=1"><title>SDV · API</title><link rel="stylesheet" href="/docs/assets/swagger-ui.css"></head><body><div id="swagger-ui"></div><script src="/docs/assets/swagger-ui-bundle.js"></script><script src="/docs/init.js"></script></body></html>'));
+  }
   express.use('/auth',async(req:any,res:any)=>{
     try{
       const url=new URL(`/auth${req.url}`,process.env.OCCORRENCIAS_URL??'http://localhost:4001/graphql');
