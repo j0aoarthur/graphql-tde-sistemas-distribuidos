@@ -1,0 +1,345 @@
+.resilience-panel {
+  display: flex;
+  flex-direction: column;
+  gap: 1.25rem;
+  margin-top: 1.5rem;
+}
+
+.resilience-header {
+  display: flex;
+  justify-content: space-between;
+  align-items: center;
+  border-bottom: 1px solid var(--border, rgba(255, 255, 255, 0.08));
+  padding-bottom: 0.75rem;
+}
+
+.resilience-title {
+  display: flex;
+  align-items: center;
+  gap: 0.75rem;
+}
+
+.resilience-title h3 {
+  font-size: 1.15rem;
+  font-weight: 600;
+  margin: 0;
+  color: var(--text-primary, #f8fafc);
+}
+
+.resilience-sub {
+  font-size: 0.85rem;
+  color: var(--text-muted, #94a3b8);
+  margin: 0.2rem 0 0;
+}
+
+.resilience-title-icon {
+  color: var(--accent, #38bdf8);
+}
+
+.resilience-grid {
+  display: grid;
+  grid-template-columns: repeat(auto-fit, minmax(360px, 1fr));
+  gap: 1.25rem;
+}
+
+.resilience-card {
+  padding: 1.25rem;
+  display: flex;
+  flex-direction: column;
+  gap: 0.85rem;
+  border-radius: 8px;
+}
+
+.resilience-card-top {
+  display: flex;
+  justify-content: space-between;
+  align-items: center;
+}
+
+.resilience-card h4 {
+  font-size: 1.05rem;
+  font-weight: 600;
+  margin: 0;
+  color: var(--text-primary, #f8fafc);
+}
+
+.resilience-card-desc {
+  font-size: 0.85rem;
+  color: var(--text-muted, #94a3b8);
+  margin: 0;
+  line-height: 1.4;
+}
+
+.cb-status-badge {
+  display: inline-flex;
+  align-items: center;
+  gap: 0.4rem;
+  padding: 0.25rem 0.65rem;
+  border-radius: 9999px;
+  font-size: 0.75rem;
+  font-weight: 700;
+  border: 1px solid transparent;
+  letter-spacing: 0.03em;
+}
+
+.cb-dot {
+  width: 7px;
+  height: 7px;
+  border-radius: 50%;
+}
+
+.cb-metrics {
+  display: grid;
+  grid-template-columns: repeat(3, 1fr);
+  gap: 0.5rem;
+  margin-top: 0.25rem;
+}
+
+.metric-box {
+  background: var(--surface-subtle, rgba(255, 255, 255, 0.03));
+  border: 1px solid var(--border, rgba(255, 255, 255, 0.06));
+  padding: 0.5rem;
+  border-radius: 6px;
+  display: flex;
+  flex-direction: column;
+  gap: 0.25rem;
+}
+
+.metric-box span {
+  font-size: 0.7rem;
+  color: var(--text-muted, #94a3b8);
+  text-transform: uppercase;
+}
+
+.metric-box strong {
+  font-size: 0.85rem;
+  color: var(--text-primary, #f8fafc);
+}
+
+.resilience-explanation {
+  background: var(--surface-subtle, rgba(255, 255, 255, 0.02));
+  border-left: 3px solid var(--accent, #38bdf8);
+  padding: 0.65rem 0.85rem;
+  border-radius: 0 6px 6px 0;
+  font-size: 0.82rem;
+  color: var(--text-secondary, #cbd5e1);
+}
+
+.explanation-line {
+  display: flex;
+  align-items: center;
+  gap: 0.5rem;
+}
+
+.resilience-action-note {
+  font-size: 0.78rem;
+  color: var(--text-muted, #94a3b8);
+}
+
+.resilience-action-note code {
+  background: rgba(0, 0, 0, 0.25);
+  padding: 0.15rem 0.35rem;
+  border-radius: 4px;
+  font-family: monospace;
+}
+
+.burst-badge {
+  display: inline-flex;
+  align-items: center;
+  gap: 0.3rem;
+  background: rgba(56, 189, 248, 0.15);
+  color: #38bdf8;
+  padding: 0.2rem 0.55rem;
+  border-radius: 9999px;
+  font-size: 0.72rem;
+  font-weight: 700;
+}
+
+.burst-controls {
+  display: flex;
+  gap: 0.75rem;
+  align-items: flex-end;
+  margin-top: 0.35rem;
+}
+
+.burst-select-group {
+  display: flex;
+  flex-direction: column;
+  gap: 0.3rem;
+  flex: 1;
+}
+
+.burst-select-group label {
+  font-size: 0.75rem;
+  color: var(--text-muted, #94a3b8);
+}
+
+.burst-select-group select {
+  padding: 0.5rem 0.75rem;
+  border-radius: 6px;
+  background: var(--surface-subtle, rgba(255, 255, 255, 0.05));
+  border: 1px solid var(--border, rgba(255, 255, 255, 0.1));
+  color: var(--text-primary, #f8fafc);
+  font-size: 0.85rem;
+}
+
+.btn-burst {
+  white-space: nowrap;
+}
+
+.burst-results-box {
+  background: rgba(16, 185, 129, 0.05);
+  border: 1px solid rgba(16, 185, 129, 0.2);
+  border-radius: 6px;
+  padding: 0.75rem;
+  display: flex;
+  flex-direction: column;
+  gap: 0.5rem;
+  animation: fadeIn 0.3s ease;
+}
+
+.burst-result-title {
+  display: flex;
+  align-items: center;
+  gap: 0.4rem;
+  font-size: 0.85rem;
+  color: var(--text-primary, #f8fafc);
+}
+
+.burst-stats-grid {
+  display: grid;
+  grid-template-columns: repeat(4, 1fr);
+  gap: 0.5rem;
+  background: rgba(0, 0, 0, 0.15);
+  padding: 0.5rem;
+  border-radius: 4px;
+}
+
+.burst-stats-grid div {
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  gap: 0.2rem;
+}
+
+.burst-stats-grid span {
+  font-size: 0.7rem;
+  color: var(--text-muted, #94a3b8);
+}
+
+.burst-stats-grid strong {
+  font-size: 0.95rem;
+}
+
+.burst-conclusion {
+  font-size: 0.78rem;
+  color: #34d399;
+  margin: 0;
+  line-height: 1.35;
+}
+
+.text-success { color: #22c55e; }
+.text-info { color: #38bdf8; }
+.text-danger { color: #ef4444; }
+
+.resilience-audit-card {
+  padding: 1.25rem;
+  border-radius: 8px;
+  display: flex;
+  flex-direction: column;
+  gap: 0.75rem;
+}
+
+.audit-header {
+  display: flex;
+  justify-content: space-between;
+  align-items: center;
+}
+
+.audit-title-wrap {
+  display: flex;
+  align-items: center;
+  gap: 0.5rem;
+  color: var(--text-primary, #f8fafc);
+  font-size: 0.95rem;
+}
+
+.audit-tag {
+  background: rgba(168, 85, 247, 0.15);
+  color: #c084fc;
+  padding: 0.2rem 0.55rem;
+  border-radius: 9999px;
+  font-size: 0.7rem;
+  font-weight: 700;
+}
+
+.audit-desc {
+  font-size: 0.85rem;
+  color: var(--text-muted, #94a3b8);
+  margin: 0;
+  line-height: 1.4;
+}
+
+.trace-box {
+  display: flex;
+  justify-content: space-between;
+  align-items: center;
+  background: var(--surface-subtle, rgba(255, 255, 255, 0.03));
+  border: 1px solid var(--border, rgba(255, 255, 255, 0.08));
+  padding: 0.65rem 0.85rem;
+  border-radius: 6px;
+  gap: 1rem;
+}
+
+.trace-value {
+  display: flex;
+  align-items: center;
+  gap: 0.5rem;
+  overflow: hidden;
+}
+
+.trace-label {
+  font-size: 0.78rem;
+  color: var(--text-muted, #94a3b8);
+  white-space: nowrap;
+}
+
+.trace-value code {
+  font-family: monospace;
+  font-size: 0.85rem;
+  color: #38bdf8;
+  word-break: break-all;
+}
+
+.btn-copy {
+  display: flex;
+  align-items: center;
+  gap: 0.35rem;
+  font-size: 0.75rem;
+  padding: 0.35rem 0.75rem;
+  white-space: nowrap;
+}
+
+.audit-command-hint {
+  display: flex;
+  flex-direction: column;
+  gap: 0.35rem;
+  font-size: 0.78rem;
+  color: var(--text-muted, #94a3b8);
+}
+
+.audit-command-hint pre {
+  margin: 0;
+  background: rgba(0, 0, 0, 0.3);
+  padding: 0.5rem 0.75rem;
+  border-radius: 4px;
+  color: #e2e8f0;
+  font-family: monospace;
+  font-size: 0.82rem;
+  overflow-x: auto;
+}
+
+@keyframes fadeIn {
+  from { opacity: 0; transform: translateY(-3px); }
+  to { opacity: 1; transform: translateY(0); }
+}

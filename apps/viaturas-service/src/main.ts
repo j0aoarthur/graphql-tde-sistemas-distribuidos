@@ -1,6 +1,6 @@
 import 'reflect-metadata';
 import { forecast,dayRange } from './estimates';
-import { Module, Injectable, OnModuleInit, OnModuleDestroy, Controller, Post, Body, Headers, UnauthorizedException, BadRequestException, ConflictException } from '@nestjs/common';
+import { Module, Injectable, OnModuleInit, OnModuleDestroy, Controller, Post, Body, Headers, UnauthorizedException, BadRequestException, ConflictException, ForbiddenException } from '@nestjs/common';
 import { NestFactory } from '@nestjs/core';
 import { GraphQLModule, Resolver, Query, Mutation, Args, Context, ResolveReference, ResolveField, Parent } from '@nestjs/graphql';
 import { ApolloFederationDriver, ApolloFederationDriverConfig } from '@nestjs/apollo';
@@ -11,16 +11,32 @@ import { rankViaturas } from '@sdv/shared';
 import { isValidPlate, normalizePlate } from '@sdv/shared/plate';
 import { randomUUID } from 'node:crypto';
 import { join } from 'node:path';
+import { createLogger, getCorrelationId } from '@sdv/shared/logger';
+
+const logger = createLogger('viaturas-service');
 
 @Injectable()
 class Database extends PrismaClient implements OnModuleInit,OnModuleDestroy {
   async onModuleInit(){await this.$connect();}
   async onModuleDestroy(){await this.$disconnect();}
 }
-function requireAdmin(ctx:any){
-  const token=String(ctx.req?.headers?.authorization??'').replace(/^Bearer\s+/i,'');
-  try {const claims=jwt.verify(token,process.env.JWT_SECRET!,{algorithms:['HS256']}) as jwt.JwtPayload;if(claims.papel!=='ADMIN') throw Error('invalid');}
-  catch {throw new UnauthorizedException('Token inválido');}
+function authenticate(ctx: any): { papel: string; sub?: string; centralId?: string } {
+  const token = String(ctx.req?.headers?.authorization ?? '').replace(/^Bearer\s+/i, '');
+  if (!token) throw new UnauthorizedException('Autenticação necessária');
+  try {
+    const claims = jwt.verify(token, process.env.JWT_SECRET!, { algorithms: ['HS256'] }) as jwt.JwtPayload;
+    if (!['ADMIN', 'SUPERVISOR', 'OPERADOR'].includes(claims.papel)) throw Error('invalid');
+    return { papel: String(claims.papel), sub: claims.sub ? String(claims.sub) : undefined, centralId: claims.centralId ? String(claims.centralId) : undefined };
+  } catch {
+    throw new UnauthorizedException('Token inválido');
+  }
+}
+function requireRole(ctx: any, allowedRoles: string[]) {
+  const actor = authenticate(ctx);
+  if (!allowedRoles.includes(actor.papel)) {
+    throw new ForbiddenException(`Acesso negado: o papel '${actor.papel}' não possui permissão para esta operação.`);
+  }
+  return actor;
 }
 const validLatLon=(a:number,b:number)=>Number.isFinite(a)&&Number.isFinite(b)&&Math.abs(a)<=90&&Math.abs(b)<=180;
 @Injectable()
@@ -64,7 +80,11 @@ class DispatchService implements OnModuleDestroy {
           await tx.outbox.create({data:{tipo:'DESPACHO_CONFIRMADO',payload:{despachoId:despacho.id,ocorrenciaId:input.ocorrenciaId,viaturaId:viatura.id}}});
           return {status:'DESPACHADA',viaturaId:viatura.id,despachoId:despacho.id};
         });
-        if(result){await this.emit('DESPACHO',input.ocorrenciaId);return result;}
+        if(result){
+          logger.info('Despacho alocado com sucesso', { ocorrenciaId: input.ocorrenciaId, viaturaId: result.viaturaId });
+          await this.emit('DESPACHO',input.ocorrenciaId);
+          return result;
+        }
       } catch(err) {
         if(err instanceof Prisma.PrismaClientKnownRequestError && err.code==='P2002') {
           const current=await this.db.despacho.findUnique({where:{ocorrenciaId:input.ocorrenciaId}});
@@ -76,6 +96,7 @@ class DispatchService implements OnModuleDestroy {
     }
     const again=await this.db.despacho.findUnique({where:{ocorrenciaId:input.ocorrenciaId}});
     if(again) return {status:'DESPACHADA',viaturaId:again.viaturaId,despachoId:again.id};
+    logger.info('Nenhuma viatura livre no momento para despacho', { ocorrenciaId: input.ocorrenciaId });
     return {status:'SEM_VIATURA'};
   }
   async finalizar(input:{ocorrenciaId:string;acao:'CONCLUIDO'|'CANCELADO'}){
@@ -90,35 +111,36 @@ class DispatchService implements OnModuleDestroy {
       await tx.outbox.create({data:{tipo:'DESPACHO_FINALIZADO',payload:{ocorrenciaId:input.ocorrenciaId,viaturaId:despacho.viaturaId,acao:input.acao}}});
       return {status:input.acao};
     });
+    logger.info('Despacho finalizado', { ocorrenciaId: input.ocorrenciaId, acao: input.acao, status: resultado.status });
     await this.emit('VIATURA',input.ocorrenciaId);return resultado;
   }
 }
 @Resolver('Viatura')
 class ViaturaResolver {
   constructor(private readonly db:Database,private readonly dispatcher:DispatchService) {}
-  @Query('preverDespacho') preverDespacho(@Context() ctx:any,@Args('latitude') latitude:number,@Args('longitude') longitude:number){requireAdmin(ctx);return forecast(this.db,latitude,longitude);}
+  @Query('preverDespacho') preverDespacho(@Context() ctx:any,@Args('latitude') latitude:number,@Args('longitude') longitude:number){authenticate(ctx);return forecast(this.db,latitude,longitude);}
   @Query('estatisticasViatura') async estatisticas(@Context() ctx:any,@Args('id') id:string,@Args('dataLocal') dataLocal?:string){
-    requireAdmin(ctx);const range=dayRange(dataLocal);
+    authenticate(ctx);const range=dayRange(dataLocal);
     const [v,turno,iniciados,concluidos,cancelados]=await Promise.all([this.db.viatura.findUnique({where:{id}}),this.db.turnoViatura.findFirst({where:{viaturaId:id,fimEm:null}}),this.db.despacho.count({where:{viaturaId:id,despachadoEm:range}}),this.db.despacho.count({where:{viaturaId:id,status:'CONCLUIDO',concluidoEm:range}}),this.db.despacho.count({where:{viaturaId:id,status:'CANCELADO',concluidoEm:range}})]);
     const durations=await this.db.$queryRaw<Array<{total:number}>>`SELECT COALESCE(SUM(GREATEST(0,EXTRACT(EPOCH FROM LEAST("chegadaEm",${range.lt})-GREATEST("saidaEm",${range.gte})))),0)::float8 AS total FROM "Despacho" WHERE "viaturaId"=${id}::uuid AND "chegadaEm" IS NOT NULL AND "saidaEm" IS NOT NULL AND "saidaEm"<${range.lt} AND "chegadaEm">${range.gte}`;
     return {tempoTotalEmDeslocamentoHoje:durations[0].total,duracaoTurno:turno?Math.floor((Date.now()-turno.inicioEm.getTime())/1000):null,despachosIniciadosHoje:iniciados,atendimentosConcluidosHoje:concluidos,canceladosHoje:cancelados,operandoDesde:turno?.inicioEm?.toISOString(),ultimoSinalEm:v?.ultimoSinalEm?.toISOString(),situacaoSinal:!v?.ultimoSinalEm?'SEM_SINAL':Date.now()-v.ultimoSinalEm.getTime()>30000?'SEM_SINAL':Date.now()-v.ultimoSinalEm.getTime()>10000?'ATRASADO':'OK'};
   }
-  @Query('despachosViatura') despachosViatura(@Context() ctx:any,@Args('id') id:string,@Args('cursor') cursor?:string,@Args('limit') limit=20){requireAdmin(ctx);return this.db.despacho.findMany({where:{viaturaId:id},orderBy:[{criadoEm:'desc'},{id:'desc'}],take:Math.min(100,Math.max(1,limit)),...(cursor?{cursor:{id:cursor},skip:1}:{})});}
-  @Query('listarViaturas') async listarViaturas(@Context() ctx:any,@Args('status') status?:string){requireAdmin(ctx);return this.db.viatura.findMany({include:{patrulha:true,turnos:{where:{fimEm:null},take:1}},where:status?{status}:undefined,orderBy:{placa:'asc'}});}
-  @Query('consultarViatura') async consultarViatura(@Context() ctx:any,@Args('id') id:string){requireAdmin(ctx);return this.db.viatura.findUnique({where:{id},include:{patrulha:true,turnos:{where:{fimEm:null},take:1}}});}
-  @Query('listarDespachos') async listarDespachos(@Context() ctx:any){requireAdmin(ctx);return this.db.despacho.findMany({include:{viatura:true},orderBy:{criadoEm:'desc'},take:400});}
-  @Query('consultarDespacho') async consultarDespacho(@Context() ctx:any,@Args('id') id:string){requireAdmin(ctx);return this.db.despacho.findUnique({where:{id},include:{viatura:true}});}
-  @Query('estadoSimulacao') estadoSimulacao(@Context() ctx:any){requireAdmin(ctx);return this.dispatcher.getSimulation();}
+  @Query('despachosViatura') despachosViatura(@Context() ctx:any,@Args('id') id:string,@Args('cursor') cursor?:string,@Args('limit') limit=20){authenticate(ctx);return this.db.despacho.findMany({where:{viaturaId:id},orderBy:[{criadoEm:'desc'},{id:'desc'}],take:Math.min(100,Math.max(1,limit)),...(cursor?{cursor:{id:cursor},skip:1}:{})});}
+  @Query('listarViaturas') async listarViaturas(@Context() ctx:any,@Args('status') status?:string){authenticate(ctx);return this.db.viatura.findMany({include:{patrulha:true,turnos:{where:{fimEm:null},take:1}},where:status?{status}:undefined,orderBy:{placa:'asc'}});}
+  @Query('consultarViatura') async consultarViatura(@Context() ctx:any,@Args('id') id:string){authenticate(ctx);return this.db.viatura.findUnique({where:{id},include:{patrulha:true,turnos:{where:{fimEm:null},take:1}}});}
+  @Query('listarDespachos') async listarDespachos(@Context() ctx:any){authenticate(ctx);return this.db.despacho.findMany({include:{viatura:true},orderBy:{criadoEm:'desc'},take:400});}
+  @Query('consultarDespacho') async consultarDespacho(@Context() ctx:any,@Args('id') id:string){authenticate(ctx);return this.db.despacho.findUnique({where:{id},include:{viatura:true}});}
+  @Query('estadoSimulacao') estadoSimulacao(@Context() ctx:any){authenticate(ctx);return this.dispatcher.getSimulation();}
   @Mutation('configurarSimulacao') configurarSimulacao(@Context() ctx:any,@Args('fator') fator:number,@Args('pausada') pausada:boolean){
-    requireAdmin(ctx);if(!Number.isFinite(fator)||fator<1||fator>60)throw new BadRequestException('Fator deve estar entre 1 e 60');
+    requireRole(ctx,['ADMIN']);if(!Number.isFinite(fator)||fator<1||fator>60)throw new BadRequestException('Fator deve estar entre 1 e 60');
     return this.dispatcher.setSimulation(fator,pausada);
   }
   @Mutation('simularFalhaGps') simularFalhaGps(@Context() ctx:any,@Args('segundos') segundos:number){
-    requireAdmin(ctx);if(!Number.isInteger(segundos)||segundos<1||segundos>120)throw new BadRequestException('Intervalo entre 1 e 120s');
+    requireRole(ctx,['ADMIN']);if(!Number.isInteger(segundos)||segundos<1||segundos>120)throw new BadRequestException('Intervalo entre 1 e 120s');
     return this.dispatcher.signalLoss(segundos);
   }
   @Mutation('cadastrarViatura') async cadastrarViatura(@Context() ctx:any,@Args('input') input:any){
-    requireAdmin(ctx);
+    requireRole(ctx,['ADMIN']);
     if(!isValidPlate(input.placa))throw new BadRequestException('Placa inválida. Use o formato ABC-1234 ou ABC1D23.');
     if(!validLatLon(input.latitude,input.longitude)||!Number.isInteger(input.capacidade)||input.capacidade<1||input.capacidade>8)throw new BadRequestException('Dados de viatura inválidos');
     // `codigo` (numero de referencia) e gerado pelo banco; a placa e normalizada e unica.
@@ -126,7 +148,7 @@ class ViaturaResolver {
     await this.dispatcher.emit('VIATURA',created.id);return created;
   }
   @Mutation('atualizarPosicaoViatura') async atualizarPosicaoViatura(@Context() ctx:any,@Args('id') id:string,@Args('latitude') latitude:number,@Args('longitude') longitude:number){
-    requireAdmin(ctx);
+    requireRole(ctx,['ADMIN']);
     if(!validLatLon(latitude,longitude))throw new BadRequestException('Coordenadas inválidas');
     const count=await this.db.viatura.updateMany({where:{id,status:'DISPONIVEL'},data:{latitude,longitude,versao:{increment:1}}});
     if(!count.count)throw new ConflictException('Viatura ocupada ou inexistente');
@@ -134,7 +156,7 @@ class ViaturaResolver {
     return this.db.viatura.findUnique({where:{id}});
   }
   @Mutation('pausarSimulacao') async pausarSimulacao(@Context() ctx:any,@Args('despachoId') despachoId:string,@Args('pausada') pausada:boolean){
-    requireAdmin(ctx);
+    requireRole(ctx,['ADMIN','SUPERVISOR']);
     const active=await this.db.despacho.findUnique({where:{id:despachoId}});
     if(!active||['CONCLUIDO','CANCELADO'].includes(active.status))throw new ConflictException('Despacho encerrado');
     const result=await this.db.despacho.update({where:{id:despachoId},data:{simulacaoPausada:pausada,previsaoChegadaEm:null,versao:{increment:1}}});
@@ -164,10 +186,31 @@ class DespachoResolver {
 class InternalController {
   constructor(private readonly dispatch:DispatchService){}
   private auth(token:string){if(!process.env.INTERNAL_SERVICE_TOKEN||token!==process.env.INTERNAL_SERVICE_TOKEN)throw new UnauthorizedException();}
-  @Post('dispatch') async dispatchCommand(@Headers('x-internal-token') token:string,@Body() input:any){this.auth(token);return this.dispatch.alocar(input);}
-  @Post('finish') async finishCommand(@Headers('x-internal-token') token:string,@Body() input:any){this.auth(token);return this.dispatch.finalizar(input);}
+  @Post('dispatch') async dispatchCommand(@Headers('x-internal-token') token:string,@Headers('x-correlation-id') correlationId:string,@Body() input:any){
+    this.auth(token);
+    const cId = correlationId || randomUUID();
+    return logger.withContext({ correlationId: cId }, () => this.dispatch.alocar(input));
+  }
+  @Post('finish') async finishCommand(@Headers('x-internal-token') token:string,@Headers('x-correlation-id') correlationId:string,@Body() input:any){
+    this.auth(token);
+    const cId = correlationId || randomUUID();
+    return logger.withContext({ correlationId: cId }, () => this.dispatch.finalizar(input));
+  }
 }
-@Module({imports:[GraphQLModule.forRoot<ApolloFederationDriverConfig>({driver:ApolloFederationDriver,typePaths:[join(__dirname,'schema.graphql')],context:({req}:any)=>({req}),introspection:process.env.NODE_ENV!=='production'})],providers:[Database,DispatchService,ViaturaResolver,DespachoResolver],controllers:[InternalController]})
+@Module({imports:[GraphQLModule.forRoot<ApolloFederationDriverConfig>({driver:ApolloFederationDriver,typePaths:[join(__dirname,'schema.graphql')],context:({req}:any)=>({req,correlationId:(req?.headers?.['x-correlation-id'] as string)||(req as any)?.correlationId||randomUUID()}),introspection:process.env.NODE_ENV!=='production'})],providers:[Database,DispatchService,ViaturaResolver,DespachoResolver],controllers:[InternalController]})
 class AppModule{}
-async function bootstrap(){const app=await NestFactory.create(AppModule);app.enableShutdownHooks();app.use('/health',(_req:any,res:any)=>res.json({status:'ok'}));await app.listen(Number(process.env.PORT||4002),'0.0.0.0');}
-bootstrap().catch(err=>{console.error(err);process.exitCode=1;});
+async function bootstrap(){
+  const app=await NestFactory.create(AppModule);
+  app.enableShutdownHooks();
+  const express=app.getHttpAdapter().getInstance();
+  express.use((req:any,res:any,next:any)=>{
+    const correlationId=(req.headers['x-correlation-id'] as string)||randomUUID();
+    req.headers['x-correlation-id']=correlationId;
+    req.correlationId=correlationId;
+    res.setHeader('x-correlation-id',correlationId);
+    logger.withContext({correlationId},()=>next());
+  });
+  express.use('/health',(_req:any,res:any)=>res.json({status:'ok'}));
+  await app.listen(Number(process.env.PORT||4002),'0.0.0.0');
+}
+bootstrap().catch(err=>{logger.error('Falha fatal em viaturas-service',err);process.exitCode=1;});

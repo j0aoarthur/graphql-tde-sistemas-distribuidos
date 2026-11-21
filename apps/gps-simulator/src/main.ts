@@ -9,10 +9,13 @@ let running=true;
 type Pos=[number,number]; // latitude, longitude
 import {haversineKm} from '@sdv/shared';
 import { advanceMotion,patrolRouteAllowed } from '@sdv/shared/motion';
+import { createLogger } from '@sdv/shared/logger';
+
+const logger = createLogger('gps-simulator');
 const routeJobs=new Map<string,Promise<void>>();
 function scheduleRoute(key:string,work:()=>Promise<void>){
  if(routeJobs.has(key))return;
- const job=Promise.resolve().then(work).catch(e=>console.error('Roteamento indisponível',key,String(e))).finally(()=>routeJobs.delete(key));routeJobs.set(key,job);
+ const job=Promise.resolve().then(work).catch(e=>{logger.error('Roteamento indisponível',{routeKey:key,error:String(e)});}).finally(()=>routeJobs.delete(key));routeJobs.set(key,job);
 }
 const routeCache=new Map<string,{expires:number;data:{rota:Pos[];distanciaMetros:number;duracaoSegundos:number}}>();
 export async function requestRoute(start:Pos,end:Pos){
@@ -39,7 +42,7 @@ async function ensureRoute(row:any){
     await redis.publish('sdv:updates',JSON.stringify({tipo:'ROTA',entidadeId:row.ocorrenciaId,timestamp:new Date().toISOString()}));
   }catch(e){
     await pool.query(`UPDATE "Despacho" SET "rotaErro"=$2 WHERE id=$1 AND rota IS NULL`,[row.id,String(e).slice(0,240)]);
-    console.error('Falha ao calcular rota',row.id,String(e));
+    logger.error('Falha ao calcular rota', { despachoId: row.id, error: String(e) });
   }
 }
 export async function step(row:any,elapsed:number){
@@ -108,7 +111,8 @@ export async function patrol(snapshots?:any[]){
    await client.query('COMMIT');if(progress===1)nextPatrolRoutes.delete(nextKey);
   }catch(e){await client.query('ROLLBACK');throw e;}finally{client.release();}
   await redis.publish('sdv:updates',JSON.stringify({tipo:'POSICAO',entidadeId:row.id,timestamp:new Date().toISOString()}));
- }catch(e){console.error('Patrulha indisponível',row.id,String(e));}}
+ }catch(e){logger.warn('Patrulha indisponível',{viaturaId:row.id,error:String(e)});}
+ }
 }
 export async function shutdown(){await pool.end();redis.disconnect();}
 async function detectSignal(){
@@ -122,14 +126,14 @@ async function tick(elapsed:number){
   if(paused==='1')return;
   await patrol();
   const {rows}=await pool.query(`SELECT d.*,v.latitude,v.longitude,v."ultimaPosicaoEm",v."velocidadeMps" FROM "Despacho" d JOIN "Viatura" v ON v.id=d."viaturaId" WHERE d.status IN ('CONFIRMADO','EM_DESLOCAMENTO') ORDER BY d."criadoEm" LIMIT 100`);
-  for(const row of rows){try{if(!row.rota)scheduleRoute('dispatch:'+row.id,()=>ensureRoute(row));else await step(row,elapsed);}catch(e){console.error('Tick',row.id,e);}}
+  for(const row of rows){try{if(!row.rota)scheduleRoute('dispatch:'+row.id,()=>ensureRoute(row));else await step(row,elapsed);}catch(e){logger.error('Tick',{despachoId:row.id,error:e});}}
 }
 async function main(){
   process.once('SIGTERM',()=>running=false);process.once('SIGINT',()=>running=false);
   // Upgrade legacy 12× installations once. Subsequent explicit laboratory controls persist.
   await redis.eval("if redis.call('SETNX',KEYS[1],'1')==1 then redis.call('SET',KEYS[2],'1') end return 1",2,'sdv:sim:urban-motion-v1','sdv:sim:factor');
   let last=Date.now();
-  while(running){const now=Date.now(),delta=Math.min(5,(now-last)/1000);last=now;try{await tick(delta);}catch(e){console.error('Simulador offline',e);}await sleep(900);}
+  while(running){const now=Date.now(),delta=Math.min(5,(now-last)/1000);last=now;try{await tick(delta);}catch(e){logger.error('Simulador offline',e);}await sleep(900);}
   await Promise.allSettled(routeJobs.values());await pool.end();redis.disconnect();
 }
-if(require.main===module)main().catch(e=>{console.error(e);process.exitCode=1;});
+if(require.main===module)main().catch(e=>{logger.error('Falha fatal no simulador',e);process.exitCode=1;});

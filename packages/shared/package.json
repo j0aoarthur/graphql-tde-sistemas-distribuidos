@@ -24,6 +24,14 @@
     "./motion": {
       "types": "./motion.d.ts",
       "default": "./motion.cjs"
+    },
+    "./logger": {
+      "types": "./logger.d.ts",
+      "default": "./logger.cjs"
+    },
+    "./circuit-breaker": {
+      "types": "./circuit-breaker.d.ts",
+      "default": "./circuit-breaker.cjs"
     }
   }
 }

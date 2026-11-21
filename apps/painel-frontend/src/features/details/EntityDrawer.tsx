@@ -1,5 +1,5 @@
-import React from 'react';
-import {ChevronDown,CheckCheck,Gauge,MapPin,MapPinned,Pause,Play,Radio,Route,Truck,Users,X,ArrowRight} from 'lucide-react';
+import React, { useState } from 'react';
+import {ChevronDown,CheckCheck,Gauge,MapPin,MapPinned,Pause,Play,Radio,Route,Truck,Users,X,ArrowRight,Copy,Check} from 'lucide-react';
 import type {Dispatch,EntitySelection,Incident,Snapshot,Vehicle,View} from '../../types';
 import {ArrivalInfo} from '../../components/ArrivalInfo';
 import {Badge,lengthText,Priority,SignalDot,VehicleTag} from '../../components/ui';
@@ -19,6 +19,10 @@ function Section({title,children,id}:{title:string;children:React.ReactNode;id:s
 /** Dados de suporte (coordenadas, protocolo) ficam recolhidos: úteis para suporte, ruído para o operador. */
 function Technical({children}:{children:React.ReactNode}){return <details className="dw-tech"><summary><ChevronDown size={14} aria-hidden="true"/>Dados técnicos</summary><div>{children}</div></details>;}
 const coords=(lat:number,lon:number)=>`${lat.toFixed(5)}, ${lon.toFixed(5)}`;
+function CopyableId({id,label}:{id:string;label:string}){
+ const[copied,setCopied]=useState(false);
+ return <span style={{display:'inline-flex',alignItems:'center',gap:'6px'}}><code title={label}>{id}</code><button type="button" className="icon-button" style={{padding:'2px',height:'auto',minWidth:'auto',opacity:0.75}} title="Copiar ID para auditoria de logs" aria-label="Copiar ID" onClick={e=>{e.stopPropagation();navigator.clipboard?.writeText(id);setCopied(true);setTimeout(()=>setCopied(false),2000);}}>{copied?<Check size={12} style={{color:'#22c55e'}}/>:<Copy size={12}/>}</button></span>;
+}
 
 export function EntityDrawer({selected,snapshot,onClose,onView,onSelect,onAction,busy,demo}:Props){
  const now=useNow(5000);
@@ -70,7 +74,7 @@ export function EntityDrawer({selected,snapshot,onClose,onView,onSelect,onAction
       <Facts items={[{label:'Referência',value:incident.referencia||'—'},{label:'Relato',value:incident.descricao||'—'},{label:'Central de origem',value:central(incident.centralId)??'—'}]}/>
      </Section>
      <Section id="dw-timeline" title="Linha do tempo"><IncidentTimeline dispatch={associated} vehicle={relatedVehicle} events={incident.eventos} paused={paused} factor={factor}/></Section>
-     <Technical><Facts items={[{label:'Coordenadas',value:coords(incident.latitude,incident.longitude)},{label:'Protocolo',value:<code>{incident.id}</code>}]}/></Technical>
+     <Technical><Facts items={[{label:'Coordenadas',value:coords(incident.latitude,incident.longitude)},{label:'Protocolo',value:<CopyableId id={incident.id} label="Protocolo"/>},{label:'Correlation ID',value:<CopyableId id={incident.clientRequestId||incident.id} label="Correlation ID distribuído"/>}]}/></Technical>
     </>}
 
     {selected.kind==='vehicle'&&vehicle&&<>
@@ -83,7 +87,7 @@ export function EntityDrawer({selected,snapshot,onClose,onView,onSelect,onAction
       <Facts items={[{label:'Último sinal',value:vehicle.ultimoSinalEm?formatAgo(vehicle.ultimoSinalEm,now):'Aguardando telemetria'},{label:'Último movimento',value:vehicle.ultimoMovimentoEm?formatAgo(vehicle.ultimoMovimentoEm,now):'Sem movimento registrado'}]}/>
      </Section>
      <VehicleInsights vehicleId={vehicle.id} incidents={snapshot.listarOcorrencias} demo={demo}/>
-     <Technical><Facts items={[{label:'Posição atual',value:coords(vehicle.latitude,vehicle.longitude)},{label:'Placa (registro)',value:vehicle.placa}]}/></Technical>
+     <Technical><Facts items={[{label:'Posição atual',value:coords(vehicle.latitude,vehicle.longitude)},{label:'Placa (registro)',value:vehicle.placa},{label:'Identificador VTR',value:<CopyableId id={vehicle.id} label="ID da viatura"/>}]}/></Technical>
     </>}
 
     {selected.kind==='dispatch'&&dispatch&&<>
@@ -99,14 +103,22 @@ export function EntityDrawer({selected,snapshot,onClose,onView,onSelect,onAction
        {relatedVehicle&&<button type="button" className="btn btn-outline" onClick={()=>onSelect('vehicle',relatedVehicle.id)}><Truck size={15}/>Ver viatura</button>}
       </div>
      </Section>
-     <Technical><Facts items={[{label:'Protocolo do despacho',value:<code>{dispatch.id}</code>}]}/></Technical>
+     <Technical><Facts items={[{label:'Protocolo do despacho',value:<CopyableId id={dispatch.id} label="Protocolo"/>},{label:'Correlation ID',value:<CopyableId id={dispatch.id} label="Correlation ID distribuído"/>}]}/></Technical>
     </>}
    </div>
 
    <div className="detail-actions dw-actions">
     {selected.kind==='incident'&&incident&&<>
-     {['DESPACHADA','EM_ATENDIMENTO'].includes(incident.status)&&<button type="button" disabled={busy} className="btn btn-primary btn-wide" onClick={()=>onAction('encerrar',incident.id)}><CheckCheck size={16}/> Encerrar atendimento</button>}
-     {!['ENCERRADA','CANCELADA','CANCELAMENTO_PENDENTE','ENCERRAMENTO_PENDENTE'].includes(incident.status)&&<button type="button" disabled={busy} className="btn btn-danger-outline btn-wide" onClick={()=>onAction('cancelar',incident.id)}><X size={16}/> Cancelar ocorrência</button>}
+     {snapshot.me?.papel!=='OPERADOR' ? (
+      <>
+       {['DESPACHADA','EM_ATENDIMENTO'].includes(incident.status)&&<button type="button" disabled={busy} className="btn btn-primary btn-wide" onClick={()=>onAction('encerrar',incident.id)}><CheckCheck size={16}/> Encerrar atendimento</button>}
+       {!['ENCERRADA','CANCELADA','CANCELAMENTO_PENDENTE','ENCERRAMENTO_PENDENTE'].includes(incident.status)&&<button type="button" disabled={busy} className="btn btn-danger-outline btn-wide" onClick={()=>onAction('cancelar',incident.id)}><X size={16}/> Cancelar ocorrência</button>}
+      </>
+     ) : (
+      <div className="demo-detail-note" style={{marginTop:0}}>
+       Perfil Operador: encerramento e cancelamento restritos a Supervisores e Administradores.
+      </div>
+     )}
     </>}
     {selected.kind==='dispatch'&&dispatch&&!['CONCLUIDO','CANCELADO','NO_LOCAL'].includes(dispatch.status)&&<button type="button" disabled={busy} className="btn btn-outline btn-wide" onClick={()=>onAction('pauseDispatch',dispatch.id,!dispatch.simulacaoPausada)}>{dispatch.simulacaoPausada?<Play size={16}/>:<Pause size={16}/>} {dispatch.simulacaoPausada?'Retomar viatura':'Pausar viatura'}</button>}
     <button type="button" className="btn btn-outline btn-wide" onClick={()=>{onView('map',selected.kind==='vehicle'?vehicle!.id:associated?.id??selected.id);onClose();}}><MapPinned size={16}/> Ver no mapa operacional</button>

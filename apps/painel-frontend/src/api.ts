@@ -5,7 +5,7 @@ import type {Snapshot} from './types';
 const API=import.meta.env.VITE_GRAPHQL_URL||'/graphql';
 const WS=import.meta.env.VITE_GRAPHQL_WS_URL||`${location.protocol==='https:'?'wss':'ws'}://${location.host}/subscriptions`;
 export const VEHICLE_FIELDS=`id codigo placa status latitude longitude capacidade versao atualizadoEm ultimoSinalEm ultimaPosicaoEm ultimoMovimentoEm direcaoGraus versaoPosicao patrulhaRota patrulhaProgresso operandoDesde`;
-export const INCIDENT_FIELDS=`id versao centralId tipo prioridade latitude longitude status viaturaId criadoEm atualizadoEm descricao enderecoFormatado referencia eventos{id tipo ocorridoEm origemServico autor descricao}`;
+export const INCIDENT_FIELDS=`id versao centralId clientRequestId tipo prioridade latitude longitude status viaturaId criadoEm atualizadoEm descricao enderecoFormatado referencia eventos{id tipo ocorridoEm origemServico autor descricao}`;
 export const DISPATCH_FIELDS=`id versao ocorrenciaId viaturaId status distanciaMetros duracaoSegundos progresso rota simulacaoPausada criadoEm concluidoEm chegadaEm saidaEm etaOriginalSegundos etaAtualSegundos previsaoChegadaEm previsaoChegadaInicialEm fatorSimulacaoAplicado`;
 export const SNAPSHOT_QUERY=`query PainelOperacional {me{id nome email centralId papel} listarCentrais{id nome codigo ativo} listarViaturas{${VEHICLE_FIELDS}} listarOcorrencias{${INCIDENT_FIELDS}} listarDespachos{${DISPATCH_FIELDS}} estadoSimulacao{fator pausada sinalIndisponivel}}`;
 export function reconcile(previous:Snapshot|null,next:Snapshot):Snapshot{if(!previous)return next;return {...next,listarViaturas:reconcileList(previous.listarViaturas,next.listarViaturas),listarOcorrencias:reconcileList(previous.listarOcorrencias,next.listarOcorrencias),listarDespachos:reconcileList(previous.listarDespachos,next.listarDespachos)};}
@@ -23,9 +23,9 @@ export async function gql<T>(query:string,variables:Record<string,unknown>={},to
   return body.data as T;
 }
 export const getSnapshot=(token:string)=>gql<Snapshot>(SNAPSHOT_QUERY,{},token);
-export function watchUpdates(token:string,onUpdate:(event?:{tipo:string;entidadeId:string})=>void,onStatus:(connected:boolean)=>void){
+export function watchUpdates(token:string,onUpdate:(event?:{tipo:string;entidadeId:string;estado?:string})=>void,onStatus:(connected:boolean)=>void){
   const client=createClient({url:WS,connectionParams:async()=>({authorization:`Bearer ${await sessionToken()}`}),lazy:true,retryAttempts:Infinity,shouldRetry:()=>true,on:{connected:()=>{onStatus(true);onUpdate();},closed:(event:unknown)=>{onStatus(false);if((event as CloseEvent).code===4403)void refreshSession().catch(()=>{});}}});
-  const unsubscribe=client.subscribe<{eventoSDV:{tipo:string;entidadeId:string}} >({query:'subscription {eventoSDV{tipo entidadeId timestamp}}'}, {
+  const unsubscribe=client.subscribe<{eventoSDV:{tipo:string;entidadeId:string;estado?:string}} >({query:'subscription {eventoSDV{tipo entidadeId timestamp estado}}'}, {
     next:(data)=>{onStatus(true);onUpdate(data.data?.eventoSDV);},
     error:()=>onStatus(false),complete:()=>onStatus(false),
   });

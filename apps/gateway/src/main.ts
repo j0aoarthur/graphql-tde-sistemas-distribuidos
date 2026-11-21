@@ -11,10 +11,19 @@ import Redis from 'ioredis';
 import * as jwt from 'jsonwebtoken';
 import { readFileSync } from 'node:fs';
 import { join } from 'node:path';
+import { createLogger, randomUUID } from '@sdv/shared/logger';
+
+const logger = createLogger('gateway');
 @Controller('health') class HealthController{@Get() ok(){return {status:'ok',service:'gateway'};}}
 @Module({imports:[GraphQLModule.forRoot<ApolloGatewayDriverConfig>({
   driver:ApolloGatewayDriver,
-  server:{introspection:process.env.NODE_ENV!=='production',context:({req}:any)=>({authorization:req.headers.authorization??''})},
+  server:{
+    introspection:process.env.NODE_ENV!=='production',
+    context:({req}:any)=>{
+      const correlationId = (req?.headers?.['x-correlation-id'] as string) || (req as any)?.correlationId || randomUUID();
+      return {authorization:req?.headers?.authorization??'',correlationId};
+    }
+  },
   gateway:{
     supergraphSdl:new IntrospectAndCompose({subgraphs:[
       {name:'ocorrencias',url:process.env.OCCORRENCIAS_URL??'http://localhost:4001/graphql'},
@@ -22,6 +31,9 @@ import { join } from 'node:path';
     ]}),
     buildService:({url})=>new RemoteGraphQLDataSource({url,willSendRequest({request,context}){
       request.http?.headers.set('authorization',String(context.authorization??''));
+      if(context.correlationId){
+        request.http?.headers.set('x-correlation-id',String(context.correlationId));
+      }
     }}),
   },
 })],controllers:[HealthController]})
@@ -38,13 +50,20 @@ function events():AsyncIterable<{eventoSDV:{tipo:string;entidadeId:string;timest
   }};
 }
 const schema=makeExecutableSchema({
-  typeDefs:`type Query { ping: String! } type SDVEvento {tipo:String! entidadeId:ID! timestamp:String!} type Subscription {eventoSDV: SDVEvento!}`,
+  typeDefs:`type Query { ping: String! } type SDVEvento {tipo:String! entidadeId:ID! timestamp:String! estado:String} type Subscription {eventoSDV: SDVEvento!}`,
   resolvers:{Query:{ping:()=>'pong'},Subscription:{eventoSDV:{subscribe:()=>events()}}},
 });
 async function bootstrap(){
   const app=await NestFactory.create(AppModule);
   const express=app.getHttpAdapter().getInstance();
   express.use(require('express').json({limit:'16kb'}));
+  express.use((req:any,res:any,next:any)=>{
+    const correlationId=(req.headers['x-correlation-id'] as string)||randomUUID();
+    req.headers['x-correlation-id']=correlationId;
+    req.correlationId=correlationId;
+    res.setHeader('x-correlation-id',correlationId);
+    logger.withContext({correlationId},()=>next());
+  });
   // Documentação da API HTTP (Swagger UI). Só com SWAGGER_ENABLED=1 e nunca em produção. Documenta também as rotas internas (token compartilhado).
   const swaggerOn=process.env.SWAGGER_ENABLED==='1'&&process.env.NODE_ENV!=='production';
   if(swaggerOn){
@@ -60,11 +79,11 @@ async function bootstrap(){
       if(req.method!=='POST'||!['/auth/login','/auth/refresh','/auth/logout'].includes(url.pathname))return res.sendStatus(404);
       // Swagger UI (dev, SWAGGER_ENABLED=1) chama da própria origem do gateway: trata como a origem do painel para passar na checagem de Origin do serviço.
       const ownOrigin=`${req.protocol}://${req.headers.host}`,forwardedOrigin=swaggerOn&&req.headers.origin===ownOrigin?(process.env.FRONTEND_ORIGIN??'http://localhost:5173').split(',')[0]:(req.headers.origin??'');
-      const response=await fetch(url,{method:'POST',headers:{'content-type':'application/json','cookie':req.headers.cookie??'','origin':forwardedOrigin,'x-sdv-csrf':req.headers['x-sdv-csrf']??''},body:JSON.stringify(req.body??{}),signal:AbortSignal.timeout(10000)});
+      const response=await fetch(url,{method:'POST',headers:{'content-type':'application/json','cookie':req.headers.cookie??'','origin':forwardedOrigin,'x-sdv-csrf':req.headers['x-sdv-csrf']??'','x-correlation-id':req.headers['x-correlation-id']??''},body:JSON.stringify(req.body??{}),signal:AbortSignal.timeout(10000)});
       res.setHeader('Cache-Control','no-store');
       const cookie=response.headers.get('set-cookie');if(cookie)res.setHeader('Set-Cookie',cookie);
       res.status(response.status).type('json').send(await response.text());
-    }catch{res.status(502).json({error:'Serviço de sessão indisponível'});}
+    }catch(err){logger.error('Serviço de sessão indisponível no proxy /auth',err);res.status(502).json({error:'Serviço de sessão indisponível'});}
   });
   app.enableCors({origin:(process.env.FRONTEND_ORIGIN??'http://localhost:5173').split(',')});
   const wss=new WebSocketServer({server:app.getHttpServer(),path:'/subscriptions'});
@@ -72,7 +91,7 @@ async function bootstrap(){
   const serverCleanup=useServer({schema,onClose:(ctx)=>{const timer=expiryTimers.get(ctx.extra.socket);if(timer)clearTimeout(timer);},onConnect:(ctx)=>{
     const auth=String(ctx.connectionParams?.authorization??'').replace(/^Bearer\s+/i,'');
     const claim=jwt.verify(auth,process.env.JWT_SECRET!,{algorithms:['HS256']}) as jwt.JwtPayload;
-    if(claim.papel!=='ADMIN'||!claim.exp)throw Error('Forbidden');
+    if(!['ADMIN','SUPERVISOR','OPERADOR'].includes(claim.papel)||!claim.exp)throw Error('Forbidden');
     const timer=setTimeout(()=>ctx.extra.socket.close(4403,'Credencial expirada'),Math.max(0,claim.exp*1000-Date.now()));
     expiryTimers.set(ctx.extra.socket,timer);
   }},wss);
@@ -80,4 +99,4 @@ async function bootstrap(){
   process.once('SIGTERM',()=>{void serverCleanup.dispose();wss.close();});
   await app.listen(Number(process.env.PORT||4000),'0.0.0.0');
 }
-bootstrap().catch(e=>{console.error(e);process.exitCode=1;});
+bootstrap().catch(e=>{logger.error('Falha fatal no Gateway',e);process.exitCode=1;});

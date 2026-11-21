@@ -8,6 +8,9 @@ import { PrismaClient, Prisma } from './generated/client';
 import * as jwt from 'jsonwebtoken';
 import * as bcrypt from 'bcryptjs';
 import { join } from 'node:path';
+import { createLogger, randomUUID, getCorrelationId } from '@sdv/shared/logger';
+
+const logger = createLogger('ocorrencias-service');
 
 @Injectable()
 class Database extends PrismaClient implements OnModuleInit, OnModuleDestroy {
@@ -19,9 +22,16 @@ function authenticate(context: any): { adminId: string; centralId: string; papel
   if (!token) throw new UnauthorizedException('Autenticação necessária');
   try {
     const decoded = jwt.verify(token, process.env.JWT_SECRET!, { algorithms: ['HS256'] }) as jwt.JwtPayload;
-    if (decoded.papel !== 'ADMIN' || !decoded.sub || !decoded.centralId) throw Error('Invalid claims');
+    if (!['ADMIN', 'SUPERVISOR', 'OPERADOR'].includes(decoded.papel) || !decoded.sub || !decoded.centralId) throw Error('Invalid claims');
     return {adminId:String(decoded.sub), centralId:String(decoded.centralId), papel:String(decoded.papel)};
   } catch { throw new UnauthorizedException('Token inválido'); }
+}
+function requireRole(context: any, allowedRoles: string[]): { adminId: string; centralId: string; papel: string } {
+  const actor = authenticate(context);
+  if (!allowedRoles.includes(actor.papel)) {
+    throw new ForbiddenException(`Acesso negado: o papel '${actor.papel}' não possui permissão para esta operação.`);
+  }
+  return actor;
 }
 const locationFields=['descricao','enderecoFormatado','bairro','cep','numero','complemento','referencia','observacoes','origemLocalizacao','precisaoLocalizacao','localConfirmado'] as const;
 function samePayload(a:any,b:any){return ['tipo','prioridade','latitude','longitude',...locationFields].every(k=>(a[k]??null)===(b[k]??null));}
@@ -72,7 +82,9 @@ class OcorrenciaResolver {
       return await this.db.$transaction(async tx => {
         const ocorrencia=await tx.ocorrencia.create({data:{centralId:p.centralId,clientRequestId:input.clientRequestId,tipo:input.tipo,prioridade:input.prioridade,latitude:input.latitude,longitude:input.longitude,...Object.fromEntries(locationFields.map(k=>[k,input[k]??(k==='enderecoFormatado'?'':null)])),descricao:input.descricao,origemLocalizacao:input.origemLocalizacao,precisaoLocalizacao:input.precisaoLocalizacao,localConfirmado:true,status:'RECEBIDA'}});
         await tx.eventoOcorrencia.create({data:{ocorrenciaId:ocorrencia.id,tipo:'OCORRENCIA_CRIADA',ocorridoEm:ocorrencia.criadoEm,origemServico:'OCORRENCIAS',eventIdOrigem:`criacao:${ocorrencia.id}`,adminId:p.adminId,centralId:p.centralId,descricao:'Ocorrência registrada'}});
-        await tx.outbox.create({data:{tipo:'OCORRENCIA_RECEBIDA',payload:{ocorrenciaId:ocorrencia.id,latitude:ocorrencia.latitude,longitude:ocorrencia.longitude}}});
+        const correlationId = ctx?.correlationId || (ctx?.req?.headers?.['x-correlation-id'] as string) || getCorrelationId() || randomUUID();
+        await tx.outbox.create({data:{tipo:'OCORRENCIA_RECEBIDA',payload:{ocorrenciaId:ocorrencia.id,latitude:ocorrencia.latitude,longitude:ocorrencia.longitude,correlationId}}});
+        logger.info('Ocorrência criada e registrada no outbox', { ocorrenciaId: ocorrencia.id, correlationId });
         return ocorrencia;
       });
     } catch(err) {
@@ -83,7 +95,7 @@ class OcorrenciaResolver {
     }
   }
   @Mutation('encerrarOcorrencia') async encerrarOcorrencia(@Context() ctx:any,@Args('id') id:string){
-    const actor=authenticate(ctx);
+    const actor=requireRole(ctx,['ADMIN','SUPERVISOR']);
     return this.db.$transaction(async tx=>{
       const oc=await tx.ocorrencia.findUnique({where:{id}});
       if(!oc) throw new BadRequestException('Ocorrência não encontrada');
@@ -92,13 +104,15 @@ class OcorrenciaResolver {
       if(oc.status!=='EM_ATENDIMENTO'&&oc.status!=='DESPACHADA') throw new ConflictException('Ocorrência ainda não foi despachada');
       const updated=await tx.ocorrencia.update({where:{id},data:{status:'ENCERRAMENTO_PENDENTE',versao:{increment:1}}});
       await tx.eventoOcorrencia.create({data:{ocorrenciaId:id,tipo:'FINALIZACAO_SOLICITADA',ocorridoEm:new Date(),origemServico:'OCORRENCIAS',eventIdOrigem:`finalizacao:${id}`,adminId:actor.adminId,centralId:actor.centralId,descricao:'Encerramento solicitado'}});
-      await tx.outbox.create({data:{tipo:'OCORRENCIA_FECHAR',payload:{ocorrenciaId:id,acao:'CONCLUIDO'}}});
+      const correlationId = ctx?.correlationId || (ctx?.req?.headers?.['x-correlation-id'] as string) || getCorrelationId() || randomUUID();
+      await tx.outbox.create({data:{tipo:'OCORRENCIA_FECHAR',payload:{ocorrenciaId:id,acao:'CONCLUIDO',correlationId}}});
+      logger.info('Encerramento de ocorrência registrado no outbox', { ocorrenciaId: id, correlationId });
       return updated;
     });
   }
   @Mutation('cancelarOcorrencia') async cancelarOcorrencia(@Context() ctx:any,@Args('id') id:string,@Args('motivo') motivo:string){
     if(!motivo?.trim()||motivo.length>500)throw new BadRequestException('Justificativa de cancelamento obrigatória');
-    const actor=authenticate(ctx);
+    const actor=requireRole(ctx,['ADMIN','SUPERVISOR']);
     return this.db.$transaction(async tx=>{
       const oc=await tx.ocorrencia.findUnique({where:{id}});
       if(!oc) throw new BadRequestException('Ocorrência não encontrada');
@@ -107,7 +121,9 @@ class OcorrenciaResolver {
       if(oc.status==='ENCERRADA'||oc.status==='ENCERRAMENTO_PENDENTE') throw new ConflictException('Ocorrência já finalizada');
       const updated=await tx.ocorrencia.update({where:{id},data:{status:'CANCELAMENTO_PENDENTE',versao:{increment:1}}});
       await tx.eventoOcorrencia.create({data:{ocorrenciaId:id,tipo:'FINALIZACAO_SOLICITADA',ocorridoEm:new Date(),origemServico:'OCORRENCIAS',eventIdOrigem:`finalizacao:${id}`,adminId:actor.adminId,centralId:actor.centralId,descricao:updated.status==='CANCELAMENTO_PENDENTE'?motivo:'Encerramento solicitado'}});
-      await tx.outbox.create({data:{tipo:'OCORRENCIA_FECHAR',payload:{ocorrenciaId:id,acao:'CANCELADO'}}});
+      const correlationId = ctx?.correlationId || (ctx?.req?.headers?.['x-correlation-id'] as string) || getCorrelationId() || randomUUID();
+      await tx.outbox.create({data:{tipo:'OCORRENCIA_FECHAR',payload:{ocorrenciaId:id,acao:'CANCELADO',correlationId}}});
+      logger.info('Cancelamento de ocorrência registrado no outbox', { ocorrenciaId: id, correlationId });
       return updated;
     });
   }
@@ -124,7 +140,22 @@ class EventoResolver {
  @ResolveField('ocorridoEm') ocorridoEm(@Parent() e:any){return e.ocorridoEm.toISOString();}
  @ResolveField('registradoEm') registradoEm(@Parent() e:any){return e.registradoEm.toISOString();}
 }
-@Module({imports:[GraphQLModule.forRoot<ApolloFederationDriverConfig>({driver:ApolloFederationDriver,typePaths:[join(__dirname,'schema.graphql')],context:({req}:any)=>({req}),introspection:process.env.NODE_ENV!=='production'})],providers:[Database,OcorrenciaResolver,EventoResolver]})
+@Module({imports:[GraphQLModule.forRoot<ApolloFederationDriverConfig>({driver:ApolloFederationDriver,typePaths:[join(__dirname,'schema.graphql')],context:({req}:any)=>({req,correlationId:(req?.headers?.['x-correlation-id'] as string)||(req as any)?.correlationId||randomUUID()}),introspection:process.env.NODE_ENV!=='production'})],providers:[Database,OcorrenciaResolver,EventoResolver]})
 class AppModule {}
-async function bootstrap(){const app=await NestFactory.create(AppModule);app.enableShutdownHooks();app.use(require('express').json({limit:'16kb'}));sessionRoutes(app.getHttpAdapter().getInstance(),app.get(Database));app.use('/health',(_req:any,res:any)=>res.json({status:'ok'}));await app.listen(Number(process.env.PORT||4001),'0.0.0.0');}
-bootstrap().catch(err=>{console.error(err);process.exitCode=1;});
+async function bootstrap(){
+  const app=await NestFactory.create(AppModule);
+  app.enableShutdownHooks();
+  const express=app.getHttpAdapter().getInstance();
+  express.use(require('express').json({limit:'16kb'}));
+  express.use((req:any,res:any,next:any)=>{
+    const correlationId=(req.headers['x-correlation-id'] as string)||randomUUID();
+    req.headers['x-correlation-id']=correlationId;
+    req.correlationId=correlationId;
+    res.setHeader('x-correlation-id',correlationId);
+    logger.withContext({correlationId},()=>next());
+  });
+  sessionRoutes(express,app.get(Database));
+  express.use('/health',(_req:any,res:any)=>res.json({status:'ok'}));
+  await app.listen(Number(process.env.PORT||4001),'0.0.0.0');
+}
+bootstrap().catch(err=>{logger.error('Falha fatal em ocorrencias-service',err);process.exitCode=1;});

@@ -4,6 +4,7 @@ type Ocorrencia @key(fields: "id") {
   versao: Int!
   id: ID!
   centralId: ID!
+  clientRequestId: ID
   descricao: String!
   enderecoFormatado: String!
   bairro: String
