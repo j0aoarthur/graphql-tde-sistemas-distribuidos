@@ -112,7 +112,11 @@
 :root[data-theme=dark] .slider-heading>div{color:#96acb9}
 :root[data-theme=dark] .slider-heading strong{color:#b4c6d2}
 :root[data-theme=dark] .slider-heading span{color:#d37469}
-:root[data-theme=dark] .sim-visual-ring{background:#273c2f;border:1px solid #314a41;color:#84dec8}
+:root[data-theme=dark] .sim-visual-modern{background:#27343a;border:1px solid #2f373c}
+:root[data-theme=dark] .sim-visual-ring{background:#1a3329;border:1px solid #274c3d;color:#4ade80;box-shadow:none}
+:root[data-theme=dark] .sim-visual-ring--offline{background:#3b1e22;border:1px solid #5c2b31;color:#f87171;box-shadow:none}
+:root[data-theme=dark] .sim-visual-details strong{color:#b4c6d2}
+:root[data-theme=dark] .sim-visual-details small{color:#8ba2b1}
 :root[data-theme=dark] .sim-status-items>div{border-top:1px solid #2e353a}
 :root[data-theme=dark] .sim-status-items>div>span{color:#8ba3b1}
 :root[data-theme=dark] .sim-status-items strong{color:#b4c6d2}
