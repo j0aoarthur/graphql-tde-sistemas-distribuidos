@@ -1,6 +1,6 @@
 import 'reflect-metadata';
 import { sessionRoutes } from './session';
-import { Module, Injectable, OnModuleInit, OnModuleDestroy, UnauthorizedException, BadRequestException, ConflictException, ForbiddenException } from '@nestjs/common';
+import { Module, Injectable, Inject, OnModuleInit, OnModuleDestroy, UnauthorizedException, BadRequestException, ConflictException, ForbiddenException } from '@nestjs/common';
 import { NestFactory } from '@nestjs/core';
 import { GraphQLModule, Resolver, Query, Mutation, Args, Context, ResolveField, Parent, ResolveReference } from '@nestjs/graphql';
 import { ApolloFederationDriver, ApolloFederationDriverConfig } from '@nestjs/apollo';
@@ -46,9 +46,10 @@ function validate(input: any) {
   if (!Number.isFinite(input.latitude) || Math.abs(input.latitude) > 90 || !Number.isFinite(input.longitude) || Math.abs(input.longitude) > 180) throw new BadRequestException('Coordenadas inválidas');
   if (typeof input.clientRequestId !== 'string' || input.clientRequestId.length < 8 || input.clientRequestId.length > 100) throw new BadRequestException('Chave de idempotência inválida');
 }
+@Injectable()
 @Resolver('Ocorrencia')
 class OcorrenciaResolver {
-  constructor(private readonly db: Database) {}
+  constructor(@Inject(Database) private readonly db: Database) {}
   @Mutation('login')
   async login(@Args('email') email: string, @Args('senha') senha: string) {
     const user=await this.db.admin.findUnique({where:{email:email.toLowerCase().trim()},include:{central:true}});
@@ -133,9 +134,10 @@ class OcorrenciaResolver {
   @ResolveField('viatura') viatura(@Parent() ocorrencia: {viaturaId:string|null}) {return ocorrencia.viaturaId?{__typename:'Viatura',id:ocorrencia.viaturaId}:null;}
   @ResolveReference() async reference(ref:{id:string}){return this.db.ocorrencia.findUnique({where:{id:ref.id}});}
 }
+@Injectable()
 @Resolver('EventoOcorrencia')
 class EventoResolver {
- constructor(private readonly db:Database){}
+ constructor(@Inject(Database) private readonly db:Database){}
  @ResolveField('autor') async autor(@Parent() e:any){if(!e.adminId)return 'Sistema';const admin=await this.db.admin.findUnique({where:{id:e.adminId},select:{nome:true}});return admin?.nome??'Administrador não disponível';}
  @ResolveField('ocorridoEm') ocorridoEm(@Parent() e:any){return e.ocorridoEm.toISOString();}
  @ResolveField('registradoEm') registradoEm(@Parent() e:any){return e.registradoEm.toISOString();}

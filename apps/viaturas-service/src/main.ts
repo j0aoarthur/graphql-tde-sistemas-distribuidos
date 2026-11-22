@@ -1,6 +1,6 @@
 import 'reflect-metadata';
 import { forecast,dayRange } from './estimates';
-import { Module, Injectable, OnModuleInit, OnModuleDestroy, Controller, Post, Body, Headers, UnauthorizedException, BadRequestException, ConflictException, ForbiddenException } from '@nestjs/common';
+import { Module, Injectable, Inject, OnModuleInit, OnModuleDestroy, Controller, Post, Body, Headers, UnauthorizedException, BadRequestException, ConflictException, ForbiddenException } from '@nestjs/common';
 import { NestFactory } from '@nestjs/core';
 import { GraphQLModule, Resolver, Query, Mutation, Args, Context, ResolveReference, ResolveField, Parent } from '@nestjs/graphql';
 import { ApolloFederationDriver, ApolloFederationDriverConfig } from '@nestjs/apollo';
@@ -42,7 +42,7 @@ const validLatLon=(a:number,b:number)=>Number.isFinite(a)&&Number.isFinite(b)&&M
 @Injectable()
 class DispatchService implements OnModuleDestroy {
   private redis=new Redis(process.env.REDIS_URL??'redis://localhost:6379',{maxRetriesPerRequest:1});
-  constructor(private readonly db: Database) {}
+  constructor(@Inject(Database) private readonly db: Database) {}
   async onModuleDestroy(){this.redis.disconnect();}
   async getSimulation(){
     const [factor,paused,signal]=await Promise.all([this.redis.get('sdv:sim:factor'),this.redis.get('sdv:sim:paused'),this.redis.get('sdv:sim:signal-lost')]);
@@ -115,9 +115,10 @@ class DispatchService implements OnModuleDestroy {
     await this.emit('VIATURA',input.ocorrenciaId);return resultado;
   }
 }
+@Injectable()
 @Resolver('Viatura')
 class ViaturaResolver {
-  constructor(private readonly db:Database,private readonly dispatcher:DispatchService) {}
+  constructor(@Inject(Database) private readonly db:Database,@Inject(DispatchService) private readonly dispatcher:DispatchService) {}
   @Query('preverDespacho') preverDespacho(@Context() ctx:any,@Args('latitude') latitude:number,@Args('longitude') longitude:number){authenticate(ctx);return forecast(this.db,latitude,longitude);}
   @Query('estatisticasViatura') async estatisticas(@Context() ctx:any,@Args('id') id:string,@Args('dataLocal') dataLocal?:string){
     authenticate(ctx);const range=dayRange(dataLocal);
@@ -184,7 +185,7 @@ class DespachoResolver {
  @ResolveField('previsaoGeradaEm') previsaoGeradaEm(@Parent() d:any){return d.previsaoGeradaEm?.toISOString()??null;} @ResolveField('rota') rota(@Parent() despacho:any){return despacho.rota?JSON.stringify(despacho.rota):null;} }
 @Controller('internal')
 class InternalController {
-  constructor(private readonly dispatch:DispatchService){}
+  constructor(@Inject(DispatchService) private readonly dispatch:DispatchService){}
   private auth(token:string){if(!process.env.INTERNAL_SERVICE_TOKEN||token!==process.env.INTERNAL_SERVICE_TOKEN)throw new UnauthorizedException();}
   @Post('dispatch') async dispatchCommand(@Headers('x-internal-token') token:string,@Headers('x-correlation-id') correlationId:string,@Body() input:any){
     this.auth(token);
