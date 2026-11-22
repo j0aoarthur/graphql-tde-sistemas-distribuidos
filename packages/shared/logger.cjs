@@ -1,6 +1,26 @@
 'use strict';
 const { AsyncLocalStorage } = require('node:async_hooks');
 const { randomUUID } = require('node:crypto');
+const path = require('node:path');
+const fs = require('node:fs');
+
+// Auto-carrega variáveis de ambiente do .env para desenvolvimento local
+try {
+  const dotenv = require('dotenv');
+  let dir = process.cwd();
+  for (let i = 0; i < 5; i++) {
+    const candidate = path.join(dir, '.env');
+    if (fs.existsSync(candidate)) {
+      dotenv.config({ path: candidate });
+      break;
+    }
+    const parent = path.dirname(dir);
+    if (parent === dir) break;
+    dir = parent;
+  }
+} catch {
+  // Ignora se dotenv não estiver disponível (ex: produção com envs injetadas pelo container)
+}
 
 const storage = new AsyncLocalStorage();
 
